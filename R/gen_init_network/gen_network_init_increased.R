@@ -101,12 +101,6 @@ for (iter in 1:niter)
   names(theta) <- names(summary(formula))
   
   print(iter)
-  print(iter)
-  print(iter)
-  print(iter)
-  print(iter)
-  print(iter)
-  print(iter)
 }
 
 theta
