@@ -3,6 +3,8 @@ my.seed=1
 set.seed(my.seed)
 setwd("~/ERGM")
 
+
+
 library(ergm)
 library(doRNG)
 library(mfergm)
