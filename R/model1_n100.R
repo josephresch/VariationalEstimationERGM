@@ -268,63 +268,135 @@ colnames(mean_mv_est) <- c("true", "MCMC-MLE","MPLE", "MFVLE")
 mean_mv_est
 
 # rm(ergm_sim_list_tapered)
-# save.image("model1_n100.RData")
+# save.image("model1_n50.RData")
+
+
+########################## Figure 1 and Figure 2 ########################## 
+library(ggplot2)
+### MCMLE Estimate Distributions
+ggplot(data.frame(Edge = ergm_sim_estim[,1]),  
+       aes(x=Edge))+
+  geom_histogram(color="darkblue", fill="lightblue", bins = 20) + 
+  ylim(0,175) +
+  geom_vline(xintercept=-4, color ="orange", size=3, linetype="longdash") +
+  ylab("Count") +
+  theme(text = element_text(size = 20),
+        axis.text.x = element_text(angle = 90, hjust = 1))
+
+ggplot(data.frame(Homophily = ergm_sim_estim[,2]), 
+       aes(x=Homophily))+
+  geom_histogram(color="darkblue", fill="lightblue", bins = 20) + 
+  ylim(0,175) +
+  geom_vline(xintercept=2, color ="orange", size=3, linetype="longdash") +
+  ylab("Count") +
+  theme(text = element_text(size = 20),
+        axis.text.x = element_text(angle = 90, hjust = 1))
+
+ggplot(data.frame(Two_Star = ergm_sim_estim[,3]), 
+       aes(x=Two_Star))+
+  geom_histogram(color="darkblue", fill="lightblue", bins = 20) + 
+  ylim(0,175) +
+  geom_vline(xintercept=.01, color ="orange", size=3, linetype="longdash") +
+  ylab("Count") +
+  theme(text = element_text(size = 20),
+        axis.text.x = element_text(angle = 90, hjust = 1))
+
+ggplot(data.frame(Triangle = ergm_sim_estim[,4]), 
+       aes(x=Triangle))+
+  geom_histogram(color="darkblue", fill="lightblue", bins = 20) + 
+  ylim(0,175) +
+  geom_vline(xintercept=.01, color ="orange", size=3, linetype="longdash") +
+  ylab("Count") +
+  theme(text = element_text(size = 20),
+        axis.text.x = element_text(angle = 90, hjust = 1))
+
+# hist(ergm_sim_estim[,1], main = NULL, xlab = "Edge")
+# hist(mfergm_estim[,1], main = NULL, xlab = "Triangle")
+
+### MFERGM Estimate Distributions
+ggplot(data.frame(Edge = mfergm_estim[,1][mfergm_estim[,1] < -1 & mfergm_estim[,1] > -7 ]), 
+       aes(x=Edge))+
+  geom_histogram(color="darkblue", fill="lemonchiffon", bins = 20) + 
+  ylim(0,210) +
+  geom_vline(xintercept=-4, color ="orange", size=3, linetype="longdash") +
+  ylab("Count") +
+  theme(text = element_text(size = 20),
+        axis.text.x = element_text(angle = 90, hjust = 1))
+
+ggplot(data.frame(Homophily = mfergm_estim[,2][mfergm_estim[,2] < 4 & mfergm_estim[,2] > 0 ]), 
+       aes(x=Homophily))+
+  geom_histogram(color="darkblue", fill="lemonchiffon", bins = 20) + 
+  ylim(0,210) +
+  geom_vline(xintercept=2, color ="orange", size=3, linetype="longdash") +
+  ylab("Count") +
+  theme(text = element_text(size = 20),
+        axis.text.x = element_text(angle = 90, hjust = 1))
+
+ggplot(data.frame(Two_Star = mfergm_estim[,3][mfergm_estim[,3] < 0.2 & mfergm_estim[,3] > -0.2 ]), 
+       aes(x=Two_Star))+
+  geom_histogram(color="darkblue", fill="lemonchiffon", bins = 20) + 
+  ylim(0,210) +
+  geom_vline(xintercept=.01, color ="orange", size=3, linetype="longdash") +
+  ylab("Count") +
+  theme(text = element_text(size = 20),
+        axis.text.x = element_text(angle = 90, hjust = 1))
+
+ggplot(data.frame(Triangle = mfergm_estim[,4][mfergm_estim[,4] < 0.5 & mfergm_estim[,4] > -0.5 ]), 
+       aes(x=Triangle))+
+  geom_histogram(color="darkblue", fill="lemonchiffon", bins = 20) + 
+  ylim(0,210) +
+  geom_vline(xintercept=.01, color ="orange", size=3, linetype="longdash") +
+  ylab("Count") +
+  theme(text = element_text(size = 20),
+        axis.text.x = element_text(angle = 90, hjust = 1))
+
+### MPLE Estimate Distributions
+ggplot(data.frame(Edge = init_params[,1]),  
+       aes(x=Edge))+
+  geom_histogram(color="darkblue", fill="lightgreen", bins = 20) + 
+  ylim(0,175) +
+  geom_vline(xintercept=-4, color ="orange", size=3, linetype="longdash") +
+  ylab("Count") +
+  theme(text = element_text(size = 20),
+        axis.text.x = element_text(angle = 90, hjust = 1))
+
+ggplot(data.frame(Homophily = init_params[,2]), 
+       aes(x=Homophily))+
+  geom_histogram(color="darkblue", fill="lightgreen", bins = 20) + 
+  ylim(0,175) +
+  geom_vline(xintercept=2, color ="orange", size=3, linetype="longdash") +
+  ylab("Count") +
+  theme(text = element_text(size = 20),
+        axis.text.x = element_text(angle = 90, hjust = 1))
+
+ggplot(data.frame(Two_Star = init_params[,3]), 
+       aes(x=Two_Star))+
+  geom_histogram(color="darkblue", fill="lightgreen", bins = 20) + 
+  ylim(0,175) +
+  geom_vline(xintercept=.01, color ="orange", size=3, linetype="longdash") +
+  ylab("Count") +
+  theme(text = element_text(size = 20),
+        axis.text.x = element_text(angle = 90, hjust = 1))
+
+ggplot(data.frame(Triangle = init_params[,4]), 
+       aes(x=Triangle))+
+  geom_histogram(color="darkblue", fill="lightgreen", bins = 20) + 
+  ylim(0,175) +
+  geom_vline(xintercept=.01, color ="orange", size=3, linetype="longdash") +
+  ylab("Count") +
+  theme(text = element_text(size = 20),
+        axis.text.x = element_text(angle = 90, hjust = 1))
+
 
 
 
 # function for outliers
 outliers <- function(x, field = 1.5, na.rm = TRUE) 
 {
-  qnt =  quantile(x, probs=c(.25, .75), na.rm = na.rm)
-  H   =  field * IQR(x, na.rm = na.rm)
+  qnt <- quantile(x, probs=c(.25, .75), na.rm = na.rm)
+  H <- field * IQR(x, na.rm = na.rm)
   which(x < (qnt[1] - H) | x > (qnt[2] + H))
 }
-replace_outliers <- function(comp, field=1.5){
-  outliers1 = outliers(comp[,1], field=field)
-  outliers2 = outliers(comp[,2], field=field)
-  outliers3 = outliers(comp[,3], field=field)
-  outliers4 = outliers(comp[,4], field=field)
-  comp[outliers1,1] = NA #median(comp[-outliers1,1], na.rm = T)
-  comp[outliers2,2] = NA # median(comp[-outliers1,2], na.rm = T)
-  comp[outliers3,3] = NA #median(comp[-outliers1,3], na.rm = T)
-  comp[outliers4,4] = NA #median(comp[-outliers1,4], na.rm = T)
-  comp
-}
-
-
-########################## Figure 1 and Figure 2 ########################## 
-library(ggplot2)
-ggplot(data.frame(Edge = ergm_sim_estim[,1]), 
-       aes(x=Edge))+geom_histogram(color="darkblue", fill="lightblue", bins = 20)
-ggplot(data.frame(Homophily = ergm_sim_estim[,2]), 
-       aes(x=Homophily))+geom_histogram(color="darkblue", fill="lightblue", bins = 20)
-ggplot(data.frame(Two_Star = ergm_sim_estim[,3]), 
-       aes(x=Two_Star))+geom_histogram(color="darkblue", fill="lightblue", bins = 20)
-ggplot(data.frame(Triangle = ergm_sim_estim[,4]), 
-       aes(x=Triangle))+geom_histogram(color="darkblue", fill="lightblue", bins = 20)
-# hist(ergm_sim_estim[,1], main = NULL, xlab = "Edge")
-# hist(mfergm_estim[,1], main = NULL, xlab = "Triangle")
-mfergm_estim_out_rm = replace_outliers(mfergm_estim)
-ggplot(data.frame(Edge = mfergm_estim_out_rm[,1]), 
-       aes(x=Edge))+geom_histogram(color="darkblue", fill="lemonchiffon", bins = 20)
-ggplot(data.frame(Homophily = mfergm_estim_out_rm[,2]), 
-       aes(x=Homophily))+geom_histogram(color="darkblue", fill="lemonchiffon", bins = 20)
-ggplot(data.frame(Two_Star = mfergm_estim_out_rm[,3]), 
-       aes(x=Two_Star))+geom_histogram(color="darkblue", fill="lemonchiffon", bins = 20)
-ggplot(data.frame(Triangle = mfergm_estim_out_rm[,4]), 
-       aes(x=Triangle))+geom_histogram(color="darkblue", fill="lemonchiffon", bins = 20)
-
-# ggplot(data.frame(Edge = mfergm_estim[,1][mfergm_estim[,1] < -2 & mfergm_estim[,1] > -6 ]), 
-#        aes(x=Edge))+geom_histogram(color="darkblue", fill="lemonchiffon", bins = 20)
-# ggplot(data.frame(Homophily = mfergm_estim[,2][mfergm_estim[,2] < 3.5 & mfergm_estim[,2] > 1 ]), 
-#        aes(x=Homophily))+geom_histogram(color="darkblue", fill="lemonchiffon", bins = 20)
-# ggplot(data.frame(Two_Star = mfergm_estim[,3][mfergm_estim[,3] < 0.2 & mfergm_estim[,3] > -0.2 ]), 
-#        aes(x=Two_Star))+geom_histogram(color="darkblue", fill="lemonchiffon", bins = 20)
-# ggplot(data.frame(Triangle = mfergm_estim[,4][mfergm_estim[,4] < 0.5 & mfergm_estim[,4] > -0.5 ]), 
-#        aes(x=Triangle))+geom_histogram(color="darkblue", fill="lemonchiffon", bins = 20)
-
-
-
 
 # replace degen and outlier fit values
 bdrmse <- function(comp, theta, degen){

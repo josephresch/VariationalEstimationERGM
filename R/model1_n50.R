@@ -1,7 +1,7 @@
 rm(list=ls())
 my.seed=108         # paper seed 108
 set.seed(my.seed)
-setwd("~/ERGM")
+setwd("~/Desktop/Paper Submission/paper_results/")
 
 library(ergm)
 library(ergm.tapered)
@@ -191,13 +191,16 @@ for (i in 1:nsims)
   tobs[i,] = g_sim_stats[i,] / (c((n^2)/2, (n^2)/2, (n^3)/2 , (n^3)/2 ))  
 }
 
+# Jitter intial params using mvn
+init_mf_params = mvtnorm::rmvnorm(nsims, mean = colMeans(init_params), sigma = 10*cov(init_params))
+
 ### Compute MFERGM Results
 mfergm_estim <- NULL
 # Double loop to reduce memory use
 Sys.sleep(5)
 for(j in 1:(nsims/100)){
   mfergm_estim_j = foreach(i = (100*(j-1)+(1:100)), .combine = rbind) %dorng% {
-    pars <- init_params[i,] * c(.5,.5,n,n)
+    pars <- init_mf_params[i,] * c(.5,.5,n,n)
     addpars <- list(n=n, tobs = tobs[i,], x=x, ninit=1)
     cd.est <- tryCatch(optimx(pars, fn = loglikmf.model4, 
                               method = "BFGS", 
@@ -228,6 +231,7 @@ if(length(degen_mfergm) > 0){
 
 # compare mean values
 Sys.sleep(5)
+set.seed(1)
 mf_mv_est = foreach(i = 1:nsims, .combine = rbind) %dorng% {
   simulate(g_sim[[i]] ~ edges+nodematch("x")+ kstar(2) + triangles,
            nsim = 10,
@@ -241,6 +245,7 @@ mfergm_mv
 
 # compare mean values
 Sys.sleep(5)
+set.seed(1)
 MPLE_mv_est = foreach(i = 1:nsims, .combine = rbind) %dorng% {
   simulate(g_sim[[i]] ~ edges+nodematch("x")+ kstar(2) + triangles,
            nsim = 10,
@@ -272,24 +277,120 @@ mean_mv_est
 
 ########################## Figure 1 and Figure 2 ########################## 
 library(ggplot2)
-ggplot(data.frame(Edge = ergm_sim_estim[,1]), 
-       aes(x=Edge))+geom_histogram(color="darkblue", fill="lightblue", bins = 20)
+### MCMLE Estimate Distributions
+ggplot(data.frame(Edge = ergm_sim_estim[,1]),  
+       aes(x=Edge))+
+  geom_histogram(color="darkblue", fill="lightblue", bins = 20) + 
+  ylim(0,175) +
+  geom_vline(xintercept=-4, color ="orange", size=3, linetype="longdash") +
+  ylab("Count") +
+  theme(text = element_text(size = 20),
+        axis.text.x = element_text(angle = 90, hjust = 1))
+  
 ggplot(data.frame(Homophily = ergm_sim_estim[,2]), 
-       aes(x=Homophily))+geom_histogram(color="darkblue", fill="lightblue", bins = 20)
+       aes(x=Homophily))+
+  geom_histogram(color="darkblue", fill="lightblue", bins = 20) + 
+  ylim(0,175) +
+  geom_vline(xintercept=2, color ="orange", size=3, linetype="longdash") +
+  ylab("Count") +
+  theme(text = element_text(size = 20),
+        axis.text.x = element_text(angle = 90, hjust = 1))
+
 ggplot(data.frame(Two_Star = ergm_sim_estim[,3]), 
-       aes(x=Two_Star))+geom_histogram(color="darkblue", fill="lightblue", bins = 20)
+       aes(x=Two_Star))+
+  geom_histogram(color="darkblue", fill="lightblue", bins = 20) + 
+  ylim(0,175) +
+  geom_vline(xintercept=.01, color ="orange", size=3, linetype="longdash") +
+  ylab("Count") +
+  theme(text = element_text(size = 20),
+        axis.text.x = element_text(angle = 90, hjust = 1))
+
 ggplot(data.frame(Triangle = ergm_sim_estim[,4]), 
-       aes(x=Triangle))+geom_histogram(color="darkblue", fill="lightblue", bins = 20)
+       aes(x=Triangle))+
+  geom_histogram(color="darkblue", fill="lightblue", bins = 20) + 
+  ylim(0,175) +
+  geom_vline(xintercept=.01, color ="orange", size=3, linetype="longdash") +
+  ylab("Count") +
+  theme(text = element_text(size = 20),
+        axis.text.x = element_text(angle = 90, hjust = 1))
+
 # hist(ergm_sim_estim[,1], main = NULL, xlab = "Edge")
 # hist(mfergm_estim[,1], main = NULL, xlab = "Triangle")
-ggplot(data.frame(Edge = mfergm_estim[,1][mfergm_estim[,1] < -2 & mfergm_estim[,1] > -6 ]), 
-       aes(x=Edge))+geom_histogram(color="darkblue", fill="lemonchiffon", bins = 20)
-ggplot(data.frame(Homophily = mfergm_estim[,2][mfergm_estim[,2] < 3.5 & mfergm_estim[,2] > 1 ]), 
-       aes(x=Homophily))+geom_histogram(color="darkblue", fill="lemonchiffon", bins = 20)
+
+### MFERGM Estimate Distributions
+ggplot(data.frame(Edge = mfergm_estim[,1][mfergm_estim[,1] < -1 & mfergm_estim[,1] > -7 ]), 
+       aes(x=Edge))+
+  geom_histogram(color="darkblue", fill="lemonchiffon", bins = 20) + 
+  ylim(0,210) +
+  geom_vline(xintercept=-4, color ="orange", size=3, linetype="longdash") +
+  ylab("Count") +
+  theme(text = element_text(size = 20),
+        axis.text.x = element_text(angle = 90, hjust = 1))
+
+ggplot(data.frame(Homophily = mfergm_estim[,2][mfergm_estim[,2] < 4 & mfergm_estim[,2] > 0 ]), 
+       aes(x=Homophily))+
+  geom_histogram(color="darkblue", fill="lemonchiffon", bins = 20) + 
+  ylim(0,210) +
+  geom_vline(xintercept=2, color ="orange", size=3, linetype="longdash") +
+  ylab("Count") +
+  theme(text = element_text(size = 20),
+        axis.text.x = element_text(angle = 90, hjust = 1))
+
 ggplot(data.frame(Two_Star = mfergm_estim[,3][mfergm_estim[,3] < 0.2 & mfergm_estim[,3] > -0.2 ]), 
-       aes(x=Two_Star))+geom_histogram(color="darkblue", fill="lemonchiffon", bins = 20)
+       aes(x=Two_Star))+
+  geom_histogram(color="darkblue", fill="lemonchiffon", bins = 20) + 
+  ylim(0,210) +
+  geom_vline(xintercept=.01, color ="orange", size=3, linetype="longdash") +
+  ylab("Count") +
+  theme(text = element_text(size = 20),
+        axis.text.x = element_text(angle = 90, hjust = 1))
+
 ggplot(data.frame(Triangle = mfergm_estim[,4][mfergm_estim[,4] < 0.5 & mfergm_estim[,4] > -0.5 ]), 
-       aes(x=Triangle))+geom_histogram(color="darkblue", fill="lemonchiffon", bins = 20)
+       aes(x=Triangle))+
+  geom_histogram(color="darkblue", fill="lemonchiffon", bins = 20) + 
+  ylim(0,210) +
+  geom_vline(xintercept=.01, color ="orange", size=3, linetype="longdash") +
+  ylab("Count") +
+  theme(text = element_text(size = 20),
+        axis.text.x = element_text(angle = 90, hjust = 1))
+
+### MPLE Estimate Distributions
+ggplot(data.frame(Edge = init_params[,1]),  
+       aes(x=Edge))+
+  geom_histogram(color="darkblue", fill="lightgreen", bins = 20) + 
+  ylim(0,175) +
+  geom_vline(xintercept=-4, color ="orange", size=3, linetype="longdash") +
+  ylab("Count") +
+  theme(text = element_text(size = 20),
+        axis.text.x = element_text(angle = 90, hjust = 1))
+
+ggplot(data.frame(Homophily = init_params[,2]), 
+       aes(x=Homophily))+
+  geom_histogram(color="darkblue", fill="lightgreen", bins = 20) + 
+  ylim(0,175) +
+  geom_vline(xintercept=2, color ="orange", size=3, linetype="longdash") +
+  ylab("Count") +
+  theme(text = element_text(size = 20),
+        axis.text.x = element_text(angle = 90, hjust = 1))
+
+ggplot(data.frame(Two_Star = init_params[,3]), 
+       aes(x=Two_Star))+
+  geom_histogram(color="darkblue", fill="lightgreen", bins = 20) + 
+  ylim(0,175) +
+  geom_vline(xintercept=.01, color ="orange", size=3, linetype="longdash") +
+  ylab("Count") +
+  theme(text = element_text(size = 20),
+        axis.text.x = element_text(angle = 90, hjust = 1))
+
+ggplot(data.frame(Triangle = init_params[,4]), 
+       aes(x=Triangle))+
+  geom_histogram(color="darkblue", fill="lightgreen", bins = 20) + 
+  ylim(0,175) +
+  geom_vline(xintercept=.01, color ="orange", size=3, linetype="longdash") +
+  ylab("Count") +
+  theme(text = element_text(size = 20),
+        axis.text.x = element_text(angle = 90, hjust = 1))
+
 
 
 
@@ -460,3 +561,4 @@ MAD_natural_parameter
 RMSE_mean_value_parameter
 # These are the RMSE of mean-value parameter estimates
 MAD_mean_value_parameter
+
