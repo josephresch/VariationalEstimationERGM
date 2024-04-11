@@ -1,0 +1,198 @@
+> rm(list=ls())
+> my.seed=2000
+> set.seed(my.seed)
+> 
+> 
+> library(ergm.tapered)
+Loading required package: ergm
+Loading required package: network
+
+‘network’ 1.18.1 (2023-01-24), part of the Statnet Project
+* ‘news(package="network")’ for changes since last version
+* ‘citation("network")’ for citation information
+* ‘https://statnet.org’ for help, support, and other information
+
+
+‘ergm’ 4.3-6983 (2022-08-20), part of the Statnet Project
+* ‘news(package="ergm")’ for changes since last version
+* ‘citation("ergm")’ for citation information
+* ‘https://statnet.org’ for help, support, and other information
+
+‘ergm’ 4 is a major update that introduces some backwards-incompatible
+changes. Please type ‘news(package="ergm")’ for a list of major
+changes.
+
+> #library(mfergm)
+> library(optimx)     # mfergm likelihood
+> library(R.utils)    # set time on ergm
+Loading required package: R.oo
+Loading required package: R.methodsS3
+R.methodsS3 v1.8.2 (2022-06-13 22:00:14 UTC) successfully loaded. See ?R.methodsS3 for help.
+R.oo v1.25.0 (2022-06-12 02:20:02 UTC) successfully loaded. See ?R.oo for help.
+
+Attaching package: ‘R.oo’
+
+The following object is masked from ‘package:R.methodsS3’:
+
+    throw
+
+The following objects are masked from ‘package:methods’:
+
+    getClasses, getMethods
+
+The following objects are masked from ‘package:base’:
+
+    attach, detach, load, save
+
+R.utils v2.12.2 (2022-11-11 22:00:03 UTC) successfully loaded. See ?R.utils for help.
+
+Attaching package: ‘R.utils’
+
+The following object is masked from ‘package:utils’:
+
+    timestamp
+
+The following objects are masked from ‘package:base’:
+
+    cat, commandArgs, getOption, isOpen, nullfile, parse, warnings
+
+> library(doParallel) # parallel loops using 'foreach'
+Loading required package: foreach
+Loading required package: iterators
+Loading required package: parallel
+> library(doRNG) # parallel loops using 'foreach'
+Loading required package: rngtools
+> 
+> ##################
+> #                #
+> #     Set-up     #
+> #                #
+> ##################
+> 
+> #if(T){
+> nsims       =  10                               # number of networks simulated
+> n           =  2000                             # number of nodes
+> theta       =  c(-2,1,1,1) * c(2,2,1/n,1/n)     # true parameters for model
+> 
+> if(F){
++ registerDoParallel(5)
++ # Extract summary stats from 'g_sim'
++ g_sim_stats = foreach(i = 1:nsims, .combine = rbind) %dorng% {
++   g <- readRDS(paste0("~/Drive/Students/JosephResch/OAVE/simdata/n2000/g_n2000_",i,".rds"))
++   summary_formula(g ~ edges + nodematch("x") + kstar(2) + triangles)
++ }
++ attr(g_sim_stats,"rng") <- NULL
++ g_sim_stats
++ 
++ ##################
++ #                #
++ #     MFERGM     #
++ #                #
++ ##################
++ 
++ # Use "theta" on mfergm instead
++ tobs <- data.frame(matrix(NA, ncol = 4, nrow = nsims))
++ names(tobs) <- c("edges", "x", "kstar2", "triangles")
++ for (i in 1:nsims) 
++ {
++   tobs[i,] = g_sim_stats[i,] / (c((n^2)/2, (n^2)/2, (n^3)/2 , (n^3)/2 ))  
++ }
++ 
++ # Initialize the parameters at MPLE
++ mcmc_params = foreach(i = 1:nsims, .combine = rbind) %dorng% {
++   g <- readRDS(paste0("~/Drive/Students/JosephResch/OAVE/simdata/n2000/g_n2000_",i,".rds"))
++   ergm(g ~ edges + nodematch("x") + kstar(2) + triangles
++        )$coefficients
++ }
++ attr(mcmc_params,"rng") <- NULL
++ 
++ save.image("model1_n2000_mcmc.RData")
++ stopImplicitCluster()
++ }else{
++ load("model1_n2000_MPLE.RData")
++ init_params <- init_params[1:10,]
++ 
++ load("model1_n2000_mcmc.good.RData")
++ #attr(init_params,"rng") <- NULL
++ #attr(mcmc_params,"rng") <- NULL
++ }
+> 
+> str(init_params)
+ num [1:10, 1:4] -3.91 -3.94 -4.14 -3.86 -4.11 ...
+ - attr(*, "dimnames")=List of 2
+  ..$ : chr [1:10] "result.1" "result.2" "result.3" "result.4" ...
+  ..$ : chr [1:4] "edges" "nodematch.x" "kstar2" "triangle"
+> cbind(theta,t(init_params)) / c(2,2,1/n,1/n)
+            theta   result.1   result.2   result.3   result.4  result.5
+edges          -2 -1.9553298 -1.9702446 -2.0709013 -1.9316059 -2.055828
+nodematch.x     1  1.0115901  1.0080388  0.9964899  0.9906451  1.016094
+kstar2          1  0.3752439  0.6708686  1.8465697  0.0899748  1.834094
+triangle        1 -0.5967779 -1.3249437  2.5743040  3.9145541 -4.624814
+              result.6   result.7  result.8   result.9 result.10
+edges       -2.0256696 -2.0397777 -2.040304 -2.0321464 -2.043627
+nodematch.x  0.9844613  0.9924257  1.003648  0.9952241  1.016921
+kstar2       1.2506255  1.4600238  1.645590  1.4373827  1.649364
+triangle     5.1378277  3.0168765 -2.252830  0.9803021 -4.240107
+> cbind(theta,t(mcmc_params)) / c(2,2,1/n,1/n)
+            theta   result.1   result.2   result.3   result.4  result.5
+edges          -2 -1.9542616 -1.9688807 -2.0712344 -1.9356645 -2.055143
+nodematch.x     1  1.0111299  1.0076671  0.9979142  0.9919118  1.016704
+kstar2          1  0.3564658  0.6503847  1.8574134  0.1402309  1.836208
+triangle        1 -0.4012288 -1.2076202  2.1727541  3.6623029 -4.939977
+              result.6   result.7  result.8   result.9 result.10
+edges       -2.0196920 -2.0331605 -2.037861 -2.0332721 -2.050520
+nodematch.x  0.9837342  0.9907136  1.003621  0.9965929  1.018182
+kstar2       1.1644132  1.3719235  1.615975  1.4603200  1.736543
+triangle     5.4607369  3.4298444 -2.282064  0.5670142 -4.486080
+> 
+> cbind(theta,apply(init_params,2,mean)) / c(2,2,1/n,1/n)
+            theta           
+edges          -2 -2.0165435
+nodematch.x     1  1.0015538
+kstar2          1  1.2259738
+triangle        1  0.2584392
+> cbind(theta,apply(mcmc_params,2,mean)) / c(2,2,1/n,1/n)
+            theta           
+edges          -2 -2.0159690
+nodematch.x     1  1.0018172
+kstar2          1  1.2189877
+triangle        1  0.1975683
+> 
+> # MPLE
+> for(i in 1:ncol(init_params)){
++   print( sprintf("%12s p-value: %f", colnames(init_params)[i],t.test(init_params[,i],mu=theta[i])$p.value))
++ }
+[1] "       edges p-value: 0.293222"
+[1] " nodematch.x p-value: 0.674690"
+[1] "      kstar2 p-value: 0.283489"
+[1] "    triangle p-value: 0.508277"
+> 
+> # MFERGM
+> for(i in 1:ncol(init_params)){
++   print( sprintf("%12s p-value: %f", colnames(init_params)[i],t.test(mcmc_params[,i],mu=theta[i])$p.value))
++ }
+[1] "       edges p-value: 0.304358"
+[1] " nodematch.x p-value: 0.631304"
+[1] "      kstar2 p-value: 0.297492"
+[1] "    triangle p-value: 0.488312"
+> 
+> cbind(
++ sqrt(apply(init_params,2,var)),
++ sqrt(apply(mcmc_params,2,var))
++ )
+                   [,1]        [,2]
+edges       0.093732088 0.092723359
+nodematch.x 0.022656046 0.023137939
+kstar2      0.000313260 0.000313120
+triangle    0.001702098 0.001755969
+> cor(init_params, mcmc_params)
+                 edges nodematch.x     kstar2   triangle
+edges        0.9961970 -0.07268357 -0.9842054  0.2321630
+nodematch.x -0.1031981  0.99573351  0.1873126 -0.9400676
+kstar2      -0.9929264  0.15713166  0.9961587 -0.3334945
+triangle     0.2547906 -0.94784588 -0.3563447  0.9965536
+> #save.image("model1_n2000_mcmc.RData")
+> 
+> proc.time()
+   user  system elapsed 
+  0.881   0.105   1.035 
