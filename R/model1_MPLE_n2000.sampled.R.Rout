@@ -1,0 +1,318 @@
+> rm(list=ls())
+> my.seed=2000
+> set.seed(my.seed)
+> 
+> 
+> library(ergm)
+Loading required package: network
+
+‘network’ 1.18.1 (2023-01-24), part of the Statnet Project
+* ‘news(package="network")’ for changes since last version
+* ‘citation("network")’ for citation information
+* ‘https://statnet.org’ for help, support, and other information
+
+
+‘ergm’ 4.3-6983 (2022-08-20), part of the Statnet Project
+* ‘news(package="ergm")’ for changes since last version
+* ‘citation("ergm")’ for citation information
+* ‘https://statnet.org’ for help, support, and other information
+
+‘ergm’ 4 is a major update that introduces some backwards-incompatible
+changes. Please type ‘news(package="ergm")’ for a list of major
+changes.
+
+> #library(ergm.tapered)
+> #library(mfergm)
+> library(optimx)     # mfergm likelihood
+> library(R.utils)    # set time on ergm
+Loading required package: R.oo
+Loading required package: R.methodsS3
+R.methodsS3 v1.8.2 (2022-06-13 22:00:14 UTC) successfully loaded. See ?R.methodsS3 for help.
+R.oo v1.25.0 (2022-06-12 02:20:02 UTC) successfully loaded. See ?R.oo for help.
+
+Attaching package: ‘R.oo’
+
+The following object is masked from ‘package:R.methodsS3’:
+
+    throw
+
+The following objects are masked from ‘package:methods’:
+
+    getClasses, getMethods
+
+The following objects are masked from ‘package:base’:
+
+    attach, detach, load, save
+
+R.utils v2.12.2 (2022-11-11 22:00:03 UTC) successfully loaded. See ?R.utils for help.
+
+Attaching package: ‘R.utils’
+
+The following object is masked from ‘package:utils’:
+
+    timestamp
+
+The following objects are masked from ‘package:base’:
+
+    cat, commandArgs, getOption, isOpen, nullfile, parse, warnings
+
+> library(doParallel) # parallel loops using 'foreach'
+Loading required package: foreach
+Loading required package: iterators
+Loading required package: parallel
+> library(doRNG) # parallel loops using 'foreach'
+Loading required package: rngtools
+> 
+> #####################################################################
+> #                                                                   #
+> #     Create High Transitivity ERGM Params (using ERGM fitting)     #
+> #                                                                   #
+> #####################################################################
+> 
+> nsims       =  200                              # number of networks simulated
+> n           =  2000                             # number of nodes
+> theta       =  c(-2,1,1,1) * c(2,2,1/n,1/n)     # true parameters for model
+> 
+> 
+> ##################
+> #                #
+> #     Set-up     #
+> #                #
+> ##################
+> 
+> if(F){
++ registerDoParallel(10)
++ ## Initialize the parameters at MPLE
++ #samp_params_tapered = foreach(i = 1:nsims, .combine = rbind) %dorng% {
++ #  g <- readRDS(paste0("~/Downloads/n2000/g_n2000_",i,".rds"))
++ #  ergm.tapered(g ~ edges + nodematch("x") + kstar(2) + triangles, 
++ #               estimate = "MPLE", control=control.ergm.tapered(estimate.tapered.bias=FALSE))$coefficients
++ #}
++ #samp_params_tapered
++ 
++ ## Extract summary stats from 'g_sim'
++ #g_sim_stats = foreach(i = 1:nsims, .combine = rbind) %dorng% {
++ #  g <- readRDS(paste0("~/Downloads/n2000/g_n2000_",i,".rds"))
++ #  summary_formula(g ~ edges + nodematch("x") + kstar(2) + triangles)
++ #}
++ #g_sim_stats
++ 
++ # Initialize the parameters at MPLE
++ samp_params = foreach(i = 1:nsims, .combine = rbind) %dorng% {
++   g <- readRDS(paste0("~/Drive/Students/JosephResch/OAVE/simdata/n2000/g_n2000_",i,".rds"))
++   ergm(g ~ edges + nodematch("x") + kstar(2) + triangles, 
++        estimate = "MPLE", control=control.ergm(MPLE.samplesize=500000))$coefficients
++ }
++ save.image("model1_n2000_MPLE_sampled.RData")
++ stopImplicitCluster()
++ }else{
++ load("model1_n2000_MPLE_sampled.RData")
++ }
+> 
+> cbind(theta,t(samp_params)) / c(2,2,1/n,1/n)
+            theta   result.1   result.2   result.3   result.4  result.5
+edges          -2 -1.9358129 -2.0059269 -2.0936995 -1.9110099 -2.026039
+nodematch.x     1  1.0091841  1.0062364  1.0028997  0.9902658  1.015442
+kstar2          1  0.1038413  1.1091500  2.1598048 -0.1734131  1.460604
+triangle        1  0.4263527 -0.7771747  0.9043431  4.0932922 -4.563896
+              result.6   result.7  result.8   result.9 result.10  result.11
+edges       -2.0372597 -2.0421287 -2.030928 -2.0512074 -1.994322 -2.0102383
+nodematch.x  0.9919271  0.9952131  1.005648  0.9999359  1.013705  0.9973174
+kstar2       1.4221281  1.5076496  1.543525  1.6993260  1.008834  1.2034083
+triangle     3.3259764  2.1242196 -2.974326 -0.3028734 -3.235676  0.2525888
+            result.12  result.13   result.14  result.15 result.16  result.17
+edges       -2.067558 -2.0626479 -1.91908946 -2.0019128 -2.025431 -2.0042788
+nodematch.x  1.003444  0.9904376  1.00656835  0.9853552  1.005216  1.0107975
+kstar2       1.895523  1.8189247 -0.01881161  0.9488623  1.220686  1.0645896
+triangle    -0.215686  2.1635524 -0.28468683  4.7093818  1.468640 -0.9566909
+             result.18 result.19  result.20  result.21  result.22 result.23
+edges       -1.9105126 -2.006477 -1.9896310 -2.0398866 -1.9780596 -2.064885
+nodematch.x  0.9811093  1.010741  0.9924565  0.9986431  0.9864448  1.001669
+kstar2      -0.1722957  1.177185  0.8594532  1.5174760  0.6874187  1.943872
+triangle     5.7651873 -3.080458  2.3441927  0.9463869  4.1166498 -1.802940
+               result.24 result.25 result.26  result.27 result.28  result.29
+edges       -1.930156206 -2.076868 -2.059920 -1.9702213 -2.047285 -1.9000895
+nodematch.x  1.004780478  1.009003  1.012650  1.0022581  1.005079  0.9896065
+kstar2       0.136065153  2.014110  1.852278  0.6617088  1.669491 -0.2892815
+triangle    -0.006106482 -1.821332 -3.174486  0.3285979 -1.312232  3.3245415
+             result.30  result.31  result.32  result.33  result.34  result.35
+edges       -1.9482033 -2.0092673 -1.9860458 -1.9799327 -1.9637554 -1.9663513
+nodematch.x  0.9826506  0.9960962  0.9897954  0.9889649  0.9999704  1.0026633
+kstar2       0.3840867  0.9655471  0.7362942  0.6911711  0.6267419  0.6060188
+triangle     3.5170258  4.5374749  4.3374868  3.9667425 -0.3289502 -0.2111651
+             result.36  result.37 result.38  result.39  result.40  result.41
+edges       -1.9459247 -1.9534299 -2.012974 -1.9977295 -2.0655346 -1.9918594
+nodematch.x  0.9909727  0.9893289  1.008986  0.9873134  1.0023065  0.9954107
+kstar2       0.3655427  0.3823659  1.176200  0.9614069  1.8892221  0.9511050
+triangle     2.1850641  3.5140118 -1.790486  3.4801049 -0.5195985  1.2318431
+             result.42  result.43  result.44  result.45  result.46  result.47
+edges       -2.0413916 -1.8821217 -1.9806125 -1.9463514 -1.9480922 -1.9437231
+nodematch.x  1.0111363  0.9955824  0.9936193  0.9923667  0.9837008  1.0057303
+kstar2       1.4892082 -0.4515544  0.7006677  0.3851418  0.3999836  0.3435646
+triangle    -0.8787946  1.7100949  3.0604111  1.5021696  3.1871939 -0.3862068
+             result.48  result.49  result.50  result.51  result.52  result.53
+edges       -2.0014625 -1.9670479 -2.0250475 -1.9034166 -1.9995275 -2.0476434
+nodematch.x  0.9996509  1.0065880  0.9954164  1.0109336  1.0021301  0.9978612
+kstar2       1.0581230  0.5944226  1.3343303 -0.1280662  0.9694192  1.6396098
+triangle     0.2106037 -0.3131499  1.1863002 -2.3635046  1.1721786  0.8172870
+             result.54  result.55  result.56 result.57  result.58  result.59
+edges       -1.9784688 -2.0819009 -1.9781493 -1.993534 -2.0002234 -1.9727448
+nodematch.x  1.0052195  1.0093897  0.9946218  1.005775  1.0017736  0.9881679
+kstar2       0.7331994  2.0337630  0.6790492  1.008095  0.9343456  0.6917505
+triangle    -0.3030792 -0.7127205  3.2485206 -1.487893  1.8437682  2.3037863
+             result.60  result.61 result.62  result.63  result.64  result.65
+edges       -2.0505523 -1.9099352 -2.061548 -1.9355461 -1.9940171 -1.9662308
+nodematch.x  0.9996176  0.9818191  1.002884  1.0050315  0.9827825  1.0047993
+kstar2       1.6702281 -0.2376841  1.872349  0.2140699  0.8210994  0.5901402
+triangle     0.6385913  6.8241668 -1.601099 -0.7198384  5.8604669 -0.1024588
+              result.66  result.67  result.68  result.69  result.70  result.71
+edges       -2.01851882 -1.9556945 -1.9677799 -1.9590034 -1.9861573 -2.0051125
+nodematch.x  1.00586758  0.9885326  0.9938282  0.9982228  0.9832721  0.9957365
+kstar2       1.24339560  0.4349240  0.5303788  0.6303858  0.8389224  1.0976201
+triangle     0.07598906  3.4069670  3.7390359 -1.2679541  4.0415397  1.2212285
+             result.72  result.73  result.74  result.75 result.76  result.77
+edges       -1.9681193 -2.1070798 -2.0650660 -1.9410371 -2.014583 -1.9913711
+nodematch.x  0.9942342  0.9867767  1.0082241  0.9904325  1.003105  0.9975100
+kstar2       0.5820774  2.3177859  1.8424672  0.1421903  1.268141  0.8763449
+triangle     2.7837033  4.2565367 -0.7408369  5.0483969 -1.029682  1.8105812
+            result.78 result.79  result.80  result.81  result.82  result.83
+edges       -2.083526 -2.104078 -1.9618197 -1.9795370 -1.9523212 -2.0941450
+nodematch.x  1.015498  1.030424  1.0047217  0.9967821  0.9929938  0.9974124
+kstar2       2.054326  2.319873  0.5064523  0.7097693  0.4796825  2.2298851
+triangle    -2.187185 -5.036552  0.1938074  2.7933301  0.8779620  0.8910147
+            result.84  result.85  result.86   result.87  result.88  result.89
+edges       -2.020456 -1.9970819 -1.9764216 -1.92905144 -1.9733399 -2.0203658
+nodematch.x  1.013017  1.0044088  0.9890479  0.98017021  0.9978264  1.0050632
+kstar2       1.243842  0.9824573  0.6638786  0.04546943  0.6623705  1.2260944
+triangle    -1.463134  0.1887897  3.8447295  5.95764448  1.2776666  0.4360899
+             result.90  result.91  result.92  result.93  result.94 result.95
+edges       -2.0080381 -1.9932451 -2.0132920 -1.9386992 -2.0209802 -2.016688
+nodematch.x  0.9955905  1.0036199  0.9995875  0.9932439  1.0095016  1.008990
+kstar2       1.1602601  0.9314340  1.2180119  0.1308987  1.2145976  1.236740
+triangle     0.4405824 -0.2087925  0.3123230  4.2039251  0.2388024 -1.163071
+            result.96  result.97  result.98  result.99 result.100 result.101
+edges       -2.024328 -1.9574672 -1.9739513 -2.0027645 -1.9820682 -2.0085224
+nodematch.x  1.014731  0.9742919  1.0090269  0.9989584  0.9907043  0.9933253
+kstar2       1.294187  0.4170022  0.6950121  1.1001170  0.7201885  1.1430449
+triangle    -1.342686  6.6414278 -2.0403314  0.1945186  3.8711759  2.0434079
+            result.102 result.103 result.104 result.105 result.106 result.107
+edges       -2.0368047 -2.0869146 -2.0389123  -2.018696 -2.0064394 -2.0109356
+nodematch.x  1.0118246  0.9971564  1.0024247   1.010438  0.9966468  1.0004762
+kstar2       1.4396269  2.0953375  1.4659130   1.215715  1.1217635  1.1567976
+triangle    -0.7789863  1.6623809  0.6962315  -1.048494  0.8933700  0.7586385
+            result.108 result.109 result.110 result.111 result.112   result.113
+edges       -2.0261652  -2.017746  -2.017331  -2.011971 -1.9739127 -2.047299546
+nodematch.x  0.9968001   1.010925   1.012874   1.000381  1.0045004  0.998384902
+kstar2       1.3256646   1.307002   1.244019   1.250827  0.6648196  1.695000695
+triangle     1.5148884  -2.340190  -1.974005  -1.011401 -0.1199897  0.003439396
+            result.114 result.115 result.116 result.117 result.118 result.119
+edges       -2.0110140 -1.9305152 -2.0305267 -1.9360408  -1.995278 -2.0158928
+nodematch.x  1.0067610  0.9834107  1.0118042  0.9889033   1.013088  0.9967795
+kstar2       1.1440629  0.1369678  1.2992933  0.1251853   0.954863  1.2168514
+triangle    -0.4203327  3.9755425  0.1888634  4.4833084  -1.854267  1.1304212
+            result.120  result.121 result.122  result.123 result.124 result.125
+edges       -2.0380707 -1.99232718 -2.0054743 -2.03295721  -2.039543 -1.9961574
+nodematch.x  0.9948282  1.00959306  0.9958029  1.00171488   1.005438  1.0077794
+kstar2       1.3894648  0.81461561  1.1404854  1.45125208   1.589494  0.9132355
+triangle     3.3282240 -0.02002377  0.6436996  0.07223716  -1.872707 -0.1976163
+            result.126 result.127 result.128 result.129 result.130 result.131
+edges       -2.0000598  -2.020070 -1.9779105 -2.0436830 -2.0222989 -1.9813242
+nodematch.x  1.0017722   1.009398  0.9902727  0.9994581  1.0131748  1.0053133
+kstar2       1.0590234   1.367133  0.6405563  1.5547329  1.1998134  0.8313461
+triangle    -0.2244762  -3.119620  4.0400457  0.6193793  0.1471274 -1.3568380
+            result.132 result.133 result.134 result.135 result.136 result.137
+edges       -1.8633816  -2.042624 -1.9433815 -2.0213188  -2.070659  -1.960087
+nodematch.x  0.9944982   1.013343  0.9983873  1.0058705   1.012926   1.014180
+kstar2      -0.7389120   1.493929  0.3069613  1.2892984   1.980599   0.606410
+triangle     2.1350903  -1.115401  0.7963264 -0.9342027  -3.134601  -3.358146
+            result.138 result.139 result.140 result.141 result.142 result.143
+edges       -1.8885682 -2.0295143 -2.0646575 -2.0576998  -2.004606  -2.005014
+nodematch.x  0.9911824  0.9924456  0.9954992  1.0061560   1.002875   1.009065
+kstar2      -0.4549130  1.4101642  1.8601577  1.6969751   1.017645   1.098210
+triangle     3.4947633  1.8160357  0.9197874 -0.2220034   1.338096  -1.515843
+            result.144  result.145 result.146 result.147 result.148 result.149
+edges       -1.8961963 -1.98198460 -1.9579649  -2.052481 -2.0154777 -1.8852407
+nodematch.x  0.9857922  1.00212732  0.9937419   1.009007  0.9940195  0.9937124
+kstar2      -0.3214344  0.82597012  0.5493885   1.814036  1.1066055 -0.4950845
+triangle     4.0218341  0.09592295  0.6253688  -3.706638  3.6553474  2.8422084
+             result.150 result.151 result.152 result.153 result.154 result.155
+edges       -1.92596308  -2.078579 -1.9495674 -2.0366212 -2.0097643 -2.0091020
+nodematch.x  0.98640089   1.002365  1.0039048  0.9916744  1.0005562  1.0031556
+kstar2      -0.06936916   1.948057  0.3714220  1.5484883  1.1704818  1.1374524
+triangle     6.20287758   1.376969  0.6250535  1.0012437  0.2480115  0.2467143
+            result.156 result.157 result.158 result.159 result.160 result.161
+edges       -1.9869666 -1.9897122 -1.9990606  -2.063724 -1.9830702  -2.043508
+nodematch.x  0.9832116  1.0127225  0.9913496   1.030984  0.9941695   1.011689
+kstar2       0.7673016  0.7814394  0.8870845   1.945824  0.8423015   1.589993
+triangle     4.9392804 -0.1446072  4.7249881  -7.688450  0.9258442  -1.960032
+            result.162 result.163 result.164 result.165 result.166  result.167
+edges       -2.0229061  -2.081869  -2.037158 -1.9497730 -2.0776118 -1.97627990
+nodematch.x  0.9886489   1.018668   1.011954  0.9866965  0.9988583  1.00035064
+kstar2       1.2797533   2.187152   1.553433  0.3661621  2.0080046  0.71306501
+triangle     3.1461525  -5.656570  -2.918867  3.5576747  0.2949756  0.05875479
+            result.168 result.169 result.170 result.171 result.172  result.173
+edges       -1.9759284  -2.023410 -1.9745959 -2.0276828 -1.9667882 -1.91915228
+nodematch.x  1.0053536   1.019212  0.9975570  0.9985762  1.0106191  0.99359272
+kstar2       0.7431337   1.329931  0.7031465  1.3173867  0.6662483 -0.01598613
+triangle    -0.5476282  -3.756882  1.0581225  2.3524444 -2.4744735  2.66491804
+            result.174 result.175 result.176 result.177 result.178 result.179
+edges        -2.045203 -1.9784759 -1.9794520  -2.052036  -1.941260 -2.0006135
+nodematch.x   1.005950  1.0000913  0.9859808   1.017700   1.009853  0.9963944
+kstar2        1.623720  0.7240988  0.7101437   1.655083   0.351860  0.9637723
+triangle     -1.723454  0.6417068  4.7002568  -2.185566  -2.221190  2.6820755
+            result.180 result.181 result.182 result.183 result.184 result.185
+edges        -2.001742  -2.051095 -2.0561946 -2.0304246 -2.0054200  -2.040540
+nodematch.x   1.012910   1.006413  0.9999463  0.9916503  1.0021160   1.009972
+kstar2        1.063867   1.748675  1.6529537  1.3583448  1.0740494   1.563615
+triangle     -2.223549  -1.897688  2.1669134  2.9798789  0.7667562  -1.861880
+            result.186 result.187 result.188 result.189 result.190 result.191
+edges       -2.0034411 -1.9780834 -1.9456912  -2.034834 -1.9356408 -1.9919319
+nodematch.x  0.9995538  0.9854441  0.9746254   1.011403  0.9857158  0.9935180
+kstar2       1.0692466  0.6910619  0.3281099   1.465494  0.1568711  0.8423749
+triangle     0.1110309  4.4567183  5.8938190  -1.545400  3.8634308  3.1819491
+            result.192 result.193 result.194 result.195 result.196 result.197
+edges       -2.0755286 -2.0820683 -2.0135200 -2.0185698  -1.992815 -1.9638928
+nodematch.x  0.9929682  0.9935671  1.0039588  0.9984972   1.015555  0.9976971
+kstar2       1.9048723  1.9919507  1.2042006  1.1399121   1.030141  0.5738207
+triangle     3.5441435  2.8911782  0.0526958  2.9646064  -4.267489  1.0467904
+            result.198 result.199 result.200
+edges       -1.9391084 -2.0129636 -2.0668531
+nodematch.x  0.9958592  0.9928169  0.9956424
+kstar2       0.2268075  1.2399895  1.8770749
+triangle     1.5257351  1.2805721  1.3714311
+> #cbind(theta,t(samp_params_tapered)) / c(2,2,1/n,1/n)
+> 
+> cbind(theta,apply(samp_params,2,mean)) / c(2,2,1/n,1/n)
+            theta           
+edges          -2 -2.0004240
+nodematch.x     1  1.0000540
+kstar2          1  1.0158209
+triangle        1  0.7837871
+> #cbind(theta,apply(samp_params_tapered,2,mean)) / c(2,2,1/n,1/n)
+> 
+> #MPLE
+> for(i in 1:ncol(samp_params)){
++   print( sprintf("%12s p-value: %f", colnames(samp_params)[i],t.test(samp_params[,i],mu=theta[i])$p.value))
++ }
+[1] "       edges p-value: 0.900077"
+[1] " nodematch.x p-value: 0.937251"
+[1] "      kstar2 p-value: 0.717135"
+[1] "    triangle p-value: 0.226341"
+> 
+> ##tapered MPLE
+> #for(i in 1:ncol(samp_params)){
+> #  print( sprintf("%12s p-value: %f", colnames(samp_params)[i],t.test(samp_params_tapered[,i],mu=theta[i])$p.value))
+> #}
+> 
+> #cbind(
+> sqrt(apply(samp_params,2,var))
+       edges  nodematch.x       kstar2     triangle 
+0.0953953171 0.0193622731 0.0003083492 0.0012597756 
+> #sqrt(apply(samp_params_tapered,2,var))
+> #)
+> 
+> #save.image("model1_n2000_MPLE.RData")
+> 
+> proc.time()
+   user  system elapsed 
+  0.807   0.096   0.949 
