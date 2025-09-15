@@ -1,0 +1,3774 @@
+> rm(list=ls())
+> my.seed=3
+> set.seed(my.seed)
+> 
+> pdf("model10_sim1.tapered.pdf")
+> 
+> library(ergm)
+Loading required package: network
+
+‘network’ 1.18.0 (2022-10-05), part of the Statnet Project
+* ‘news(package="network")’ for changes since last version
+* ‘citation("network")’ for citation information
+* ‘https://statnet.org’ for help, support, and other information
+
+
+‘ergm’ 4.3-6983 (2022-08-20), part of the Statnet Project
+* ‘news(package="ergm")’ for changes since last version
+* ‘citation("ergm")’ for citation information
+* ‘https://statnet.org’ for help, support, and other information
+
+‘ergm’ 4 is a major update that introduces some backwards-incompatible
+changes. Please type ‘news(package="ergm")’ for a list of major
+changes.
+
+> library(doRNG)
+Loading required package: foreach
+Loading required package: rngtools
+> library(mfergm)
+> library(optimx)     # mfergm likelihood
+> library(R.utils)    # set time on ergm
+Loading required package: R.oo
+Loading required package: R.methodsS3
+R.methodsS3 v1.8.2 (2022-06-13 22:00:14 UTC) successfully loaded. See ?R.methodsS3 for help.
+R.oo v1.25.0 (2022-06-12 02:20:02 UTC) successfully loaded. See ?R.oo for help.
+
+Attaching package: ‘R.oo’
+
+The following object is masked from ‘package:R.methodsS3’:
+
+    throw
+
+The following objects are masked from ‘package:methods’:
+
+    getClasses, getMethods
+
+The following objects are masked from ‘package:base’:
+
+    attach, detach, load, save
+
+R.utils v2.12.0 (2022-06-28 03:20:05 UTC) successfully loaded. See ?R.utils for help.
+
+Attaching package: ‘R.utils’
+
+The following object is masked from ‘package:utils’:
+
+    timestamp
+
+The following objects are masked from ‘package:base’:
+
+    cat, commandArgs, getOption, isOpen, nullfile, parse, warnings
+
+> library(doParallel) # parallel loops using 'foreach'
+Loading required package: iterators
+Loading required package: parallel
+> 
+> #####################################################################
+> #                                                                   #
+> #     Create High Transitivity ERGM Params (using ERGM fitting)     #
+> #                                                                   #
+> #####################################################################
+> 
+> nsims       =  200                               # number of networks simulated
+> n           =  100                               # number of nodes
+> mv_1 <- c(400.31, 349.88, 3254.42,     126.28)   # mean-value parameters standard model
+> mv_1 <- c(393.0512, 341.0188, 3092.0576, 117.4754) # Long-run estimate
+> theta       =  c(-2,1,1,1) * c(2,2,1/n,1/n)      # true parameters for model 2
+> ##################
+> #                #
+> #     Set-up     #
+> #                #
+> ##################
+> 
+> g <- initialize.network(theta, n, directed = FALSE)
+> x <- rbinom(n, 1, 0.5) # attributes
+> set.vertex.attribute(g, # the name of the network object
++                      "x", # the name we want to reference the variable by in that object
++                      x # the value we are giving that variable
++ ) 
+> 
+> formula <- g ~ edges + nodematch("x") + kstar(2) + triangles
+> names(mv_1) <- names(summary(formula))
+> 
+> load("sim10.RData")
+> theta
+[1] -4.00  2.00  0.01  0.01
+> set.seed(my.seed)
+> registerDoParallel(10)
+> a = foreach(i = 1:10) %dorng% {
++  simulate(sim ~ edges + nodematch("x") + kstar(2) + triangles, 
++                   nsim = nsims/10,
++                   coef = theta,
++ 		  control=control.simulate.formula(MCMC.burnin=1000000, MCMC.interval=1000000)
++                               )
++ }
+> sim <- a[[1]][[nsims/10]]
+> g_sim <- NULL
+> for(i in 1:10){
++   g_sim <- c(g_sim, a[[i]])
++ }
+> rm(a)
+> #save(sim, file="sim10.RData")
+> 
+> # Extract summary stats from 'g_sim'
+> g_sim_stats = foreach(i = 1:(nsims), .combine = rbind) %dorng% {
++  as.vector(summary_formula(g_sim[[i]] ~ edges + nodematch("x") + kstar(2) + triangles))
++ }
+> 
+> a = foreach(i = 2:10, .combine = rbind) %dorng% {
++  simulate(sim ~ edges + nodematch("x") + kstar(2) + triangles, 
++                   nsim = nsims,
++                   coef = theta,
++                   output = "stats",
++ 		  control=control.simulate.formula(MCMC.burnin=1000000, MCMC.interval=100000)
++                               )
++ }
+> g_sim_stats <- rbind(g_sim_stats, a)
+> rm(a)
+> 
+> pairs(g_sim_stats)
+> dev.off()
+null device 
+          1 
+> 
+> mv_s <- apply(g_sim_stats,2,mean)
+> mv_s
+      edges nodematch.x      kstar2    triangle 
+   392.1395    340.4010   3076.3440    116.8350 
+> #names(mv_s) <- names(fit$tapering.coefficients)
+> names(mv_s) <- c("edges", "x", "kstar2", "triangles")
+> cbind(mv_1, mv_s)
+                 mv_1      mv_s
+edges        393.0512  392.1395
+nodematch.x  341.0188  340.4010
+kstar2      3092.0576 3076.3440
+triangle     117.4754  116.8350
+> 
+> mv_s <- mv_1
+> 
+> t.test(g_sim_stats[,2], mu=mv_1[2])
+
+	One Sample t-test
+
+data:  g_sim_stats[, 2]
+t = -1.5606, df = 1999, p-value = 0.1188
+alternative hypothesis: true mean is not equal to 341.0188
+95 percent confidence interval:
+ 339.6246 341.1774
+sample estimates:
+mean of x 
+  340.401 
+
+> t.test(g_sim_stats[,3], mu=mv_1[3])
+
+	One Sample t-test
+
+data:  g_sim_stats[, 3]
+t = -2.2587, df = 1999, p-value = 0.02401
+alternative hypothesis: true mean is not equal to 3092.058
+95 percent confidence interval:
+ 3062.701 3089.987
+sample estimates:
+mean of x 
+ 3076.344 
+
+> t.test(g_sim_stats[,4], mu=mv_1[4])
+
+	One Sample t-test
+
+data:  g_sim_stats[, 4]
+t = -1.3818, df = 1999, p-value = 0.1672
+alternative hypothesis: true mean is not equal to 117.4754
+95 percent confidence interval:
+ 115.9261 117.7439
+sample estimates:
+mean of x 
+  116.835 
+
+> #q()
+> # Initialize the parameters at MPLE
+> #init_params = matrix(nrow = nsims, ncol = length(theta))
+> init_params = foreach(i = 1:nsims, .combine = rbind) %dorng% {
++   ergm(g_sim[[i]] ~ edges + nodematch("x") + kstar(2) + triangles, 
++                estimate = "MPLE")$coefficients
++ }
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Starting maximum pseudolikelihood estimation (MPLE):
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Maximizing the pseudolikelihood.
+Maximizing the pseudolikelihood.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Maximizing the pseudolikelihood.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Maximizing the pseudolikelihood.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. Evaluating log-likelihood at the estimate. 
+Finished MPLE.
+
+Finished MPLE.
+Maximizing the pseudolikelihood.
+Stopping at the initial estimate.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. Finished MPLE.
+Evaluating log-likelihood at the estimate. Finished MPLE.
+
+
+Stopping at the initial estimate.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. Evaluating log-likelihood at the estimate. Finished MPLE.
+
+Finished MPLE.
+Stopping at the initial estimate.
+
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. Finished MPLE.
+Evaluating log-likelihood at the estimate. 
+
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. Starting maximum pseudolikelihood estimation (MPLE):
+Starting maximum pseudolikelihood estimation (MPLE):
+
+Maximizing the pseudolikelihood.
+Evaluating the predictor and response matrix.
+Evaluating the predictor and response matrix.
+Finished MPLE.
+Stopping at the initial estimate.
+Starting maximum pseudolikelihood estimation (MPLE):
+Maximizing the pseudolikelihood.
+Maximizing the pseudolikelihood.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Evaluating the predictor and response matrix.
+Evaluating log-likelihood at the estimate. 
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. Maximizing the pseudolikelihood.
+Finished MPLE.
+
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Maximizing the pseudolikelihood.
+Starting maximum pseudolikelihood estimation (MPLE):
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Finished MPLE.
+Evaluating the predictor and response matrix.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. Stopping at the initial estimate.
+
+Evaluating log-likelihood at the estimate. 
+Maximizing the pseudolikelihood.
+Maximizing the pseudolikelihood.
+Maximizing the pseudolikelihood.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Finished MPLE.
+Finished MPLE.
+Stopping at the initial estimate.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. Maximizing the pseudolikelihood.
+
+Evaluating log-likelihood at the estimate. 
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. Maximizing the pseudolikelihood.
+
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Maximizing the pseudolikelihood.
+Stopping at the initial estimate.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating log-likelihood at the estimate. Finished MPLE.
+
+Stopping at the initial estimate.
+Evaluating the predictor and response matrix.
+Finished MPLE.
+Evaluating log-likelihood at the estimate. Starting maximum pseudolikelihood estimation (MPLE):
+Stopping at the initial estimate.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Evaluating log-likelihood at the estimate. 
+Evaluating the predictor and response matrix.
+
+Maximizing the pseudolikelihood.
+Maximizing the pseudolikelihood.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Finished MPLE.
+Stopping at the initial estimate.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. Evaluating log-likelihood at the estimate. 
+
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. Maximizing the pseudolikelihood.
+
+Finished MPLE.
+Maximizing the pseudolikelihood.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Finished MPLE.
+Stopping at the initial estimate.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Maximizing the pseudolikelihood.
+Maximizing the pseudolikelihood.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Finished MPLE.
+Finished MPLE.
+Stopping at the initial estimate.
+Stopping at the initial estimate.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. Evaluating log-likelihood at the estimate. Finished MPLE.
+Evaluating log-likelihood at the estimate. Stopping at the initial estimate.
+
+Starting maximum pseudolikelihood estimation (MPLE):
+
+
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Starting maximum pseudolikelihood estimation (MPLE):
+Finished MPLE.
+Evaluating the predictor and response matrix.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Maximizing the pseudolikelihood.
+Maximizing the pseudolikelihood.
+Maximizing the pseudolikelihood.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. Finished MPLE.
+
+Finished MPLE.
+Finished MPLE.
+Stopping at the initial estimate.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. Evaluating log-likelihood at the estimate. 
+
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Evaluating log-likelihood at the estimate. 
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Evaluating log-likelihood at the estimate. Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Finished MPLE.
+Evaluating log-likelihood at the estimate. Stopping at the initial estimate.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+
+Maximizing the pseudolikelihood.
+Evaluating log-likelihood at the estimate. Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+
+Finished MPLE.
+Stopping at the initial estimate.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Finished MPLE.
+Maximizing the pseudolikelihood.
+Evaluating log-likelihood at the estimate. Stopping at the initial estimate.
+Finished MPLE.
+
+Maximizing the pseudolikelihood.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. Maximizing the pseudolikelihood.
+
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Finished MPLE.
+Evaluating the predictor and response matrix.
+Stopping at the initial estimate.
+Finished MPLE.
+Evaluating log-likelihood at the estimate. Stopping at the initial estimate.
+
+Evaluating log-likelihood at the estimate. Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Maximizing the pseudolikelihood.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Finished MPLE.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Stopping at the initial estimate.
+Maximizing the pseudolikelihood.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Maximizing the pseudolikelihood.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Stopping at the initial estimate.
+Finished MPLE.
+Stopping at the initial estimate.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Evaluating log-likelihood at the estimate. Maximizing the pseudolikelihood.
+
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Finished MPLE.
+Evaluating the predictor and response matrix.
+Stopping at the initial estimate.
+Finished MPLE.
+Evaluating log-likelihood at the estimate. Stopping at the initial estimate.
+
+Evaluating log-likelihood at the estimate. 
+Maximizing the pseudolikelihood.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Starting maximum pseudolikelihood estimation (MPLE):
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Stopping at the initial estimate.
+Finished MPLE.
+Evaluating log-likelihood at the estimate. Evaluating the predictor and response matrix.
+
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Maximizing the pseudolikelihood.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Finished MPLE.
+Maximizing the pseudolikelihood.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Finished MPLE.
+Stopping at the initial estimate.
+Maximizing the pseudolikelihood.
+Evaluating log-likelihood at the estimate. 
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+
+Starting maximum pseudolikelihood estimation (MPLE):
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Evaluating the predictor and response matrix.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Starting maximum pseudolikelihood estimation (MPLE):
+Maximizing the pseudolikelihood.
+Evaluating the predictor and response matrix.
+Finished MPLE.
+Stopping at the initial estimate.
+Maximizing the pseudolikelihood.
+Maximizing the pseudolikelihood.
+Maximizing the pseudolikelihood.
+Evaluating log-likelihood at the estimate. 
+Finished MPLE.
+Maximizing the pseudolikelihood.
+Stopping at the initial estimate.
+Finished MPLE.
+Evaluating log-likelihood at the estimate. Stopping at the initial estimate.
+
+Evaluating log-likelihood at the estimate. Finished MPLE.
+
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. Finished MPLE.
+
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Maximizing the pseudolikelihood.
+Stopping at the initial estimate.
+Maximizing the pseudolikelihood.
+Evaluating log-likelihood at the estimate. 
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Finished MPLE.
+Finished MPLE.
+Finished MPLE.
+Stopping at the initial estimate.
+Stopping at the initial estimate.
+Stopping at the initial estimate.
+Stopping at the initial estimate.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating log-likelihood at the estimate. Evaluating log-likelihood at the estimate. Evaluating the predictor and response matrix.
+
+Evaluating log-likelihood at the estimate. 
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Starting maximum pseudolikelihood estimation (MPLE):
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Evaluating the predictor and response matrix.
+
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Maximizing the pseudolikelihood.
+Evaluating log-likelihood at the estimate. Maximizing the pseudolikelihood.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. Finished MPLE.
+
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. Finished MPLE.
+
+Stopping at the initial estimate.
+Maximizing the pseudolikelihood.
+Evaluating log-likelihood at the estimate. 
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Finished MPLE.
+Maximizing the pseudolikelihood.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. Finished MPLE.
+Maximizing the pseudolikelihood.
+
+Starting maximum pseudolikelihood estimation (MPLE):
+Maximizing the pseudolikelihood.
+Evaluating the predictor and response matrix.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Maximizing the pseudolikelihood.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. Finished MPLE.
+Finished MPLE.
+
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. Starting maximum pseudolikelihood estimation (MPLE):
+Stopping at the initial estimate.
+Evaluating the predictor and response matrix.
+
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Evaluating log-likelihood at the estimate. Maximizing the pseudolikelihood.
+
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Finished MPLE.
+Finished MPLE.
+Stopping at the initial estimate.
+Stopping at the initial estimate.
+Maximizing the pseudolikelihood.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. Evaluating log-likelihood at the estimate. Evaluating log-likelihood at the estimate. 
+
+
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Finished MPLE.
+Stopping at the initial estimate.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. Evaluating log-likelihood at the estimate. 
+
+Maximizing the pseudolikelihood.
+Maximizing the pseudolikelihood.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Finished MPLE.
+Stopping at the initial estimate.
+Finished MPLE.
+Evaluating log-likelihood at the estimate. Stopping at the initial estimate.
+
+Evaluating log-likelihood at the estimate. 
+Maximizing the pseudolikelihood.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Finished MPLE.
+Stopping at the initial estimate.
+Maximizing the pseudolikelihood.
+Evaluating log-likelihood at the estimate. 
+Maximizing the pseudolikelihood.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Finished MPLE.
+Stopping at the initial estimate.
+Finished MPLE.
+Evaluating log-likelihood at the estimate. Stopping at the initial estimate.
+Starting maximum pseudolikelihood estimation (MPLE):
+
+Evaluating log-likelihood at the estimate. Evaluating the predictor and response matrix.
+
+Maximizing the pseudolikelihood.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Finished MPLE.
+Evaluating log-likelihood at the estimate. Stopping at the initial estimate.
+
+Evaluating log-likelihood at the estimate. 
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Evaluating log-likelihood at the estimate. Finished MPLE.
+Maximizing the pseudolikelihood.
+Starting maximum pseudolikelihood estimation (MPLE):
+Stopping at the initial estimate.
+
+Evaluating log-likelihood at the estimate. Evaluating the predictor and response matrix.
+
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Maximizing the pseudolikelihood.
+Evaluating log-likelihood at the estimate. 
+Finished MPLE.
+Stopping at the initial estimate.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Maximizing the pseudolikelihood.
+Maximizing the pseudolikelihood.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Finished MPLE.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. Starting maximum pseudolikelihood estimation (MPLE):
+Stopping at the initial estimate.
+Finished MPLE.
+
+Evaluating log-likelihood at the estimate. Starting maximum pseudolikelihood estimation (MPLE):
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. Evaluating the predictor and response matrix.
+
+Evaluating the predictor and response matrix.
+Evaluating log-likelihood at the estimate. 
+Maximizing the pseudolikelihood.
+
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. Maximizing the pseudolikelihood.
+
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Maximizing the pseudolikelihood.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Finished MPLE.
+Finished MPLE.
+Stopping at the initial estimate.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. Evaluating log-likelihood at the estimate. 
+
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Maximizing the pseudolikelihood.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Finished MPLE.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Finished MPLE.
+Stopping at the initial estimate.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Evaluating log-likelihood at the estimate. 
+
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Maximizing the pseudolikelihood.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Finished MPLE.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Finished MPLE.
+Stopping at the initial estimate.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. Maximizing the pseudolikelihood.
+Starting maximum pseudolikelihood estimation (MPLE):
+Finished MPLE.
+Evaluating log-likelihood at the estimate. Stopping at the initial estimate.
+Starting maximum pseudolikelihood estimation (MPLE):
+
+Stopping at the initial estimate.
+
+Evaluating the predictor and response matrix.
+Evaluating log-likelihood at the estimate. Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+
+Evaluating log-likelihood at the estimate. Finished MPLE.
+
+Stopping at the initial estimate.
+Finished MPLE.
+Evaluating log-likelihood at the estimate. Stopping at the initial estimate.
+
+Maximizing the pseudolikelihood.
+Evaluating log-likelihood at the estimate. Maximizing the pseudolikelihood.
+
+Finished MPLE.
+Finished MPLE.
+Stopping at the initial estimate.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Maximizing the pseudolikelihood.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Finished MPLE.
+Stopping at the initial estimate.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Starting maximum pseudolikelihood estimation (MPLE):
+Maximizing the pseudolikelihood.
+Evaluating the predictor and response matrix.
+Finished MPLE.
+Starting maximum pseudolikelihood estimation (MPLE):
+Maximizing the pseudolikelihood.
+Stopping at the initial estimate.
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Evaluating log-likelihood at the estimate. 
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. Finished MPLE.
+
+Finished MPLE.
+Starting maximum pseudolikelihood estimation (MPLE):
+Stopping at the initial estimate.
+Evaluating the predictor and response matrix.
+Evaluating log-likelihood at the estimate. Maximizing the pseudolikelihood.
+Stopping at the initial estimate.
+
+Starting maximum pseudolikelihood estimation (MPLE):
+Finished MPLE.
+Evaluating log-likelihood at the estimate. Starting maximum pseudolikelihood estimation (MPLE):
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Evaluating the predictor and response matrix.
+Stopping at the initial estimate.
+Evaluating the predictor and response matrix.
+
+Maximizing the pseudolikelihood.
+Evaluating log-likelihood at the estimate. 
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. Maximizing the pseudolikelihood.
+
+Maximizing the pseudolikelihood.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Finished MPLE.
+Stopping at the initial estimate.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. Starting maximum pseudolikelihood estimation (MPLE):
+Finished MPLE.
+Evaluating the predictor and response matrix.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Evaluating log-likelihood at the estimate. 
+
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Finished MPLE.
+Stopping at the initial estimate.
+Maximizing the pseudolikelihood.
+Maximizing the pseudolikelihood.
+Evaluating log-likelihood at the estimate. 
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Finished MPLE.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Starting maximum pseudolikelihood estimation (MPLE):
+Stopping at the initial estimate.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Evaluating the predictor and response matrix.
+Evaluating the predictor and response matrix.
+Evaluating log-likelihood at the estimate. Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+
+Maximizing the pseudolikelihood.
+Maximizing the pseudolikelihood.
+Maximizing the pseudolikelihood.
+Maximizing the pseudolikelihood.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Finished MPLE.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Stopping at the initial estimate.
+Finished MPLE.
+Evaluating log-likelihood at the estimate. Stopping at the initial estimate.
+Finished MPLE.
+Evaluating log-likelihood at the estimate. 
+Stopping at the initial estimate.
+Maximizing the pseudolikelihood.
+
+Finished MPLE.
+Evaluating log-likelihood at the estimate. Evaluating log-likelihood at the estimate. 
+Stopping at the initial estimate.
+Maximizing the pseudolikelihood.
+Evaluating log-likelihood at the estimate. Finished MPLE.
+
+Stopping at the initial estimate.
+
+Starting maximum pseudolikelihood estimation (MPLE):
+Finished MPLE.
+Evaluating the predictor and response matrix.
+Evaluating log-likelihood at the estimate. Stopping at the initial estimate.
+
+Evaluating log-likelihood at the estimate. Starting maximum pseudolikelihood estimation (MPLE):
+
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Finished MPLE.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Finished MPLE.
+Maximizing the pseudolikelihood.
+Maximizing the pseudolikelihood.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. Finished MPLE.
+Maximizing the pseudolikelihood.
+
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. Finished MPLE.
+
+Starting maximum pseudolikelihood estimation (MPLE):
+Stopping at the initial estimate.
+Evaluating the predictor and response matrix.
+Finished MPLE.
+Evaluating log-likelihood at the estimate. 
+Maximizing the pseudolikelihood.
+Stopping at the initial estimate.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating log-likelihood at the estimate. 
+Evaluating the predictor and response matrix.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Finished MPLE.
+Maximizing the pseudolikelihood.
+Maximizing the pseudolikelihood.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Finished MPLE.
+Stopping at the initial estimate.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. Evaluating log-likelihood at the estimate. 
+
+Finished MPLE.
+Stopping at the initial estimate.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Finished MPLE.
+Stopping at the initial estimate.
+Finished MPLE.
+Evaluating log-likelihood at the estimate. Stopping at the initial estimate.
+
+Maximizing the pseudolikelihood.
+Evaluating log-likelihood at the estimate. 
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Finished MPLE.
+Stopping at the initial estimate.
+Starting maximum pseudolikelihood estimation (MPLE):
+Stopping at the initial estimate.
+Evaluating the predictor and response matrix.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Evaluating log-likelihood at the estimate. Maximizing the pseudolikelihood.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+
+Starting maximum pseudolikelihood estimation (MPLE):
+Finished MPLE.
+Maximizing the pseudolikelihood.
+Maximizing the pseudolikelihood.
+Stopping at the initial estimate.
+Evaluating the predictor and response matrix.
+Evaluating log-likelihood at the estimate. 
+Finished MPLE.
+Stopping at the initial estimate.
+Finished MPLE.
+Evaluating log-likelihood at the estimate. Stopping at the initial estimate.
+
+Maximizing the pseudolikelihood.
+Evaluating log-likelihood at the estimate. Starting maximum pseudolikelihood estimation (MPLE):
+Maximizing the pseudolikelihood.
+Evaluating the predictor and response matrix.
+
+Finished MPLE.
+Stopping at the initial estimate.
+Maximizing the pseudolikelihood.
+Evaluating log-likelihood at the estimate. 
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. Starting maximum pseudolikelihood estimation (MPLE):
+Finished MPLE.
+
+Stopping at the initial estimate.
+Evaluating the predictor and response matrix.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Evaluating log-likelihood at the estimate. 
+Finished MPLE.
+Stopping at the initial estimate.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Evaluating log-likelihood at the estimate. Starting maximum pseudolikelihood estimation (MPLE):
+
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Maximizing the pseudolikelihood.
+Stopping at the initial estimate.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating log-likelihood at the estimate. Evaluating the predictor and response matrix.
+Finished MPLE.
+
+Starting maximum pseudolikelihood estimation (MPLE):
+Stopping at the initial estimate.
+Evaluating the predictor and response matrix.
+Evaluating log-likelihood at the estimate. 
+Finished MPLE.
+Maximizing the pseudolikelihood.
+Stopping at the initial estimate.
+Finished MPLE.
+Evaluating log-likelihood at the estimate. Maximizing the pseudolikelihood.
+Stopping at the initial estimate.
+Starting maximum pseudolikelihood estimation (MPLE):
+
+Evaluating log-likelihood at the estimate. Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Finished MPLE.
+Stopping at the initial estimate.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating log-likelihood at the estimate. Stopping at the initial estimate.
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Evaluating log-likelihood at the estimate. 
+Stopping at the initial estimate.
+
+Evaluating log-likelihood at the estimate. 
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Finished MPLE.
+Evaluating log-likelihood at the estimate. Stopping at the initial estimate.
+
+Evaluating log-likelihood at the estimate. Starting maximum pseudolikelihood estimation (MPLE):
+
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Finished MPLE.
+Starting maximum pseudolikelihood estimation (MPLE):
+Maximizing the pseudolikelihood.
+Evaluating the predictor and response matrix.
+Stopping at the initial estimate.
+Stopping at the initial estimate.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Evaluating log-likelihood at the estimate. Maximizing the pseudolikelihood.
+
+Evaluating log-likelihood at the estimate. 
+Finished MPLE.
+Stopping at the initial estimate.
+Maximizing the pseudolikelihood.
+Evaluating log-likelihood at the estimate. 
+Maximizing the pseudolikelihood.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. Finished MPLE.
+
+Stopping at the initial estimate.
+Finished MPLE.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Stopping at the initial estimate.
+Finished MPLE.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Evaluating log-likelihood at the estimate. Evaluating log-likelihood at the estimate. Stopping at the initial estimate.
+
+
+Evaluating log-likelihood at the estimate. 
+Maximizing the pseudolikelihood.
+Maximizing the pseudolikelihood.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Finished MPLE.
+Stopping at the initial estimate.
+Finished MPLE.
+Evaluating log-likelihood at the estimate. 
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Evaluating log-likelihood at the estimate. Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+
+Maximizing the pseudolikelihood.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+
+Maximizing the pseudolikelihood.
+Starting maximum pseudolikelihood estimation (MPLE):
+Maximizing the pseudolikelihood.
+Evaluating the predictor and response matrix.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Maximizing the pseudolikelihood.
+Starting maximum pseudolikelihood estimation (MPLE):
+Finished MPLE.
+Evaluating the predictor and response matrix.
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Finished MPLE.
+Starting maximum pseudolikelihood estimation (MPLE):
+Finished MPLE.
+Evaluating the predictor and response matrix.
+Stopping at the initial estimate.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. Evaluating log-likelihood at the estimate. Maximizing the pseudolikelihood.
+
+
+Maximizing the pseudolikelihood.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Finished MPLE.
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating log-likelihood at the estimate. Evaluating the predictor and response matrix.
+Finished MPLE.
+
+Stopping at the initial estimate.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. Evaluating log-likelihood at the estimate. 
+
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Starting maximum pseudolikelihood estimation (MPLE):
+Finished MPLE.
+Evaluating the predictor and response matrix.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. Maximizing the pseudolikelihood.
+
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+> 
+> ##########################
+> #                        #
+> #     ERGM (Default)     #
+> #                        #
+> ##########################
+> 
+> ### Compute ERGM Results
+> #stopImplicitCluster()
+> #registerDoParallel(5)
+> 
+> ### Compute ERGM Results
+> ergm_sim_list_tapered = foreach(i = 1:nsims) %dorng% {
++   # cat("***********************************\n")
++   # cat(paste("estimating sample" ,i, "\n"))
++   # cat("***********************************\n")
++   skip_to_next <- FALSE
++   formula <- g_sim[[i]] ~ edges + nodematch("x") + kstar(2) + triangles
++   ergm_sim = 
++     tryCatch(withTimeout(
++                           ergm(formula, eval.loglik=FALSE,
++                                control=control.ergm(init = init_params[i,], MCMC.samplesize=10000)),
++                timeout = 5*60, onTimeout = "error"),
++                error = function(e) {skip_to_next <<- NULL})
++   ergm_sim
++ }
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Iteration 1 of at most 60:
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Iteration 1 of at most 60:
+Iteration 1 of at most 60:
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+Optimizing with step length 1.0000.
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0971.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+The log-likelihood improved by 0.0444.
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0083.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Optimizing with step length 1.0000.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+The log-likelihood improved by 0.0091.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Optimizing with step length 1.0000.
+Iteration 1 of at most 60:
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+The log-likelihood improved by 0.0250.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Convergence test p-value: < 0.0001. Optimizing with step length 1.0000.
+Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Optimizing with step length 1.0000.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+The log-likelihood improved by 0.0710.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+The log-likelihood improved by 0.0123.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+The log-likelihood improved by 0.0661.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0854.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0416.
+The log-likelihood improved by 0.0317.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+The log-likelihood improved by 0.0036.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0318.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+The log-likelihood improved by 0.0621.
+Iteration 1 of at most 60:
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+Optimizing with step length 1.0000.
+Optimizing with step length 1.0000.
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0172.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+The log-likelihood improved by 0.0089.
+The log-likelihood improved by 0.0059.
+The log-likelihood improved by 0.0240.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Optimizing with step length 1.0000.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Iteration 1 of at most 60:
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+The log-likelihood improved by 0.0027.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0226.
+The log-likelihood improved by 0.0030.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.3085.
+Estimating equations are not within tolerance region.
+Iteration 2 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0232.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0199.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0023.
+The log-likelihood improved by 0.0258.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Optimizing with step length 1.0000.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+The log-likelihood improved by 0.0014.
+Optimizing with step length 1.0000.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+The log-likelihood improved by 0.1114.
+Estimating equations are not within tolerance region.
+Iteration 2 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.1574.
+Estimating equations are not within tolerance region.
+Iteration 2 of at most 60:
+Optimizing with step length 1.0000.
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0034.
+The log-likelihood improved by 0.0053.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Iteration 1 of at most 60:
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0060.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0418.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0219.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0561.
+The log-likelihood improved by 0.0084.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+The log-likelihood improved by 0.0231.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0064.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0002.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0045.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0031.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0018.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0292.
+The log-likelihood improved by 0.0707.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Optimizing with step length 1.0000.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+The log-likelihood improved by 0.0072.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+The log-likelihood improved by 0.0165.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0104.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0260.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0456.
+Optimizing with step length 1.0000.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+The log-likelihood improved by 0.0435.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0190.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0081.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+The log-likelihood improved by 0.1088.
+Estimating equations are not within tolerance region.
+Iteration 2 of at most 60:
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0006.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0196.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0100.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0011.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0187.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0503.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.2575.
+Estimating equations are not within tolerance region.
+Iteration 2 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0272.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0476.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0233.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0137.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0053.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0053.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0046.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+The log-likelihood improved by 0.0056.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0001.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0100.
+Optimizing with step length 1.0000.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+The log-likelihood improved by 0.0026.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0042.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0033.
+Optimizing with step length 1.0000.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+The log-likelihood improved by 0.0059.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0019.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0026.
+The log-likelihood improved by 0.1016.
+Estimating equations are not within tolerance region.
+Iteration 2 of at most 60:
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Optimizing with step length 1.0000.
+Iteration 1 of at most 60:
+The log-likelihood improved by 0.0046.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0279.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.1408.
+Estimating equations are not within tolerance region.
+Iteration 2 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0003.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+The log-likelihood improved by 0.0189.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0271.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.2918.
+Estimating equations are not within tolerance region.
+Iteration 2 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0075.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0514.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0086.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0861.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+The log-likelihood improved by 0.0178.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0123.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.2142.
+Estimating equations are not within tolerance region.
+Iteration 2 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0083.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0010.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0041.
+Optimizing with step length 1.0000.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+The log-likelihood improved by 0.0112.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0279.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0013.
+The log-likelihood improved by 0.0280.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0026.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0432.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0406.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0082.
+The log-likelihood improved by 0.0092.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0136.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.1199.
+Estimating equations are not within tolerance region.
+Iteration 2 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0124.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0018.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0084.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0163.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+The log-likelihood improved by 0.0053.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0036.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0380.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0014.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0048.
+Optimizing with step length 1.0000.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+The log-likelihood improved by 0.0023.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Optimizing with step length 1.0000.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+The log-likelihood improved by 0.1150.
+Estimating equations are not within tolerance region.
+Iteration 2 of at most 60:
+Optimizing with step length 1.0000.
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0045.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+The log-likelihood improved by 0.0087.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0403.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0014.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.1731.
+Estimating equations are not within tolerance region.
+Iteration 2 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0187.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0264.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Optimizing with step length 1.0000.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+The log-likelihood improved by 0.0019.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0040.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0020.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0153.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0029.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0118.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0070.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0068.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0274.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0012.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0014.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+The log-likelihood improved by 0.0018.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0117.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0114.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0113.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+The log-likelihood improved by 0.0020.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0013.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0708.
+Optimizing with step length 1.0000.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+The log-likelihood improved by 0.0700.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.2245.
+Estimating equations are not within tolerance region.
+Iteration 2 of at most 60:
+The log-likelihood improved by 0.0380.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0058.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0131.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0013.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0012.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+The log-likelihood improved by 0.0812.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0175.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0076.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0107.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0003.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0091.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0012.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0302.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.1638.
+Estimating equations are not within tolerance region.
+Iteration 2 of at most 60:
+Optimizing with step length 1.0000.
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0143.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+The log-likelihood improved by 0.0111.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0788.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Optimizing with step length 1.0000.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+The log-likelihood improved by 0.0108.
+Optimizing with step length 1.0000.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+The log-likelihood improved by 0.0105.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0022.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.1153.
+Estimating equations are not within tolerance region.
+Iteration 2 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0680.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0350.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0014.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0107.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0387.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+Optimizing with step length 1.0000.
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0023.
+The log-likelihood improved by 0.0124.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+The log-likelihood improved by 0.0213.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0026.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0040.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0010.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0011.
+The log-likelihood improved by 0.0086.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0049.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0412.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0247.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0255.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0727.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0103.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0189.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0039.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0242.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0157.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0047.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0133.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0227.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0038.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0028.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0154.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0315.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0546.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0008.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0056.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0361.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0014.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0371.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0075.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0064.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0426.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.1125.
+Estimating equations are not within tolerance region.
+Iteration 2 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0083.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0037.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0170.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0077.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0055.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0032.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0156.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0853.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0624.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0498.
+Convergence test p-value: < 0.0001. Converged with 99% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+> 
+> ergm_sim_estim_tapered = matrix(0, nrow = nsims, ncol = 4)
+> for(i in 1:nsims)
++ {
++   if(!is.null(ergm_sim_list_tapered[[i]]))
++   {
++     est.params <- ergm_sim_list_tapered[[i]]$coefficients
++     ergm_sim_estim_tapered[i,] <- est.params
++   }
++   else {ergm_sim_estim_tapered[i,] = c(NA, NA, NA, NA)}
++ }
+> 
+> #### DEGENERACIES
+> degen_tapered = which(!complete.cases(ergm_sim_estim_tapered))
+> # 58 of em
+> degen_tapered
+[1]  53 112
+> 
+> if(length(degen_tapered) > 0 ){
++ #degen_list_tapered = ergm_sim_list_tapered[[]]
++ #ergm_degen_list_tapered = foreach(i = 1:length(degen_tapered)) %dorng% {
++ #  skip_to_next <- FALSE
++ #  formula <- g_sim[[degen_tapered[i]]] ~ edges + nodematch("x") + kstar(2) + triangles
++ #  ergm_sim_tapered = tryCatch(withTimeout(ergm(formula, eval.loglik=FALSE,
++ #                                        control=control.ergm(init=theta, MCMLE.confidence=0.95
++ #                                       #   # MCMC.burnin=100000,
++ #                                       #   # MCMC.interval=1000,
++ #                                       #   # MCMC.samplesize = 5000,
++ #                                          )
++ #  ), timeout = 5*60, onTimeout = "error"),
++ #  error = function(e) {skip_to_next <<- NULL})
++ #  ergm_sim_tapered
++ #}
++ #ergm_degen_list_tapered
++ 
++ ergm_degen_estim_tapered = matrix(0, nrow = length(degen_tapered), ncol = 4)
++ for(i in 1:length(degen_tapered))
++ {
++  #if(!is.null(ergm_degen_list_tapered[[i]]))
++  #{
++    # est.params <- ergm_degen_list_tapered[[i]]$coefficients
++    # ergm_degen_estim_tapered[i,] <- est.params
++    # ergm_sim_estim_tapered[degen_tapered[i],] <- est.params
++      ergm_sim_estim_tapered[degen_tapered[i],] <- init_params[degen_tapered[i],]
++  #}
++  #else {ergm_degen_estim_tapered[i,] = c(NA, NA, NA, NA)}
++ }
++ }
+> 
+> ergm_result_tapered = apply(ergm_sim_estim_tapered, 2, mean, na.rm = T)
+> ergm_result_tapered
+[1] -3.9054734774  2.0096943730  0.0034871947 -0.0002658004
+> 
+> ergm_sim_estim_tapered
+            [,1]     [,2]          [,3]          [,4]
+  [1,] -3.645785 2.119987 -0.0076412855 -0.0993403218
+  [2,] -3.404349 1.858508 -0.0090061454 -0.0038944716
+  [3,] -3.884416 1.862889  0.0029265626  0.1204070993
+  [4,] -3.948592 2.271746 -0.0106920415  0.0078927500
+  [5,] -3.907358 2.234705 -0.0095351520 -0.0515577949
+  [6,] -3.763768 2.129501 -0.0051129932 -0.0556595008
+  [7,] -4.162965 2.119505  0.0163914104 -0.0990104205
+  [8,] -3.255672 1.850292 -0.0586669703  0.3480050574
+  [9,] -3.875165 1.911580  0.0030148620  0.0802586824
+ [10,] -3.695855 1.970348 -0.0298023789  0.3133546097
+ [11,] -4.019211 1.906939  0.0168521966 -0.0201111853
+ [12,] -4.399832 1.942977  0.0366969826 -0.0609377138
+ [13,] -4.024565 1.937527  0.0162389492  0.0015631669
+ [14,] -3.706030 1.964433 -0.0168296835  0.1410856916
+ [15,] -3.722613 1.816669  0.0013449123  0.0238687296
+ [16,] -4.116522 2.103062 -0.0038494479  0.1906114220
+ [17,] -3.275895 1.761482 -0.0277627160  0.0642752377
+ [18,] -3.744348 1.807899 -0.0014528698  0.0573502028
+ [19,] -4.090888 2.219475  0.0062756786  0.0536990294
+ [20,] -4.287759 2.111231  0.0286165393 -0.1275790393
+ [21,] -3.774147 2.065857 -0.0071748964  0.0066483717
+ [22,] -4.084374 1.997268  0.0199346303 -0.0233145775
+ [23,] -3.745958 1.835884  0.0051171263 -0.0343645541
+ [24,] -3.897037 1.966438  0.0018261052  0.0897479511
+ [25,] -3.355041 1.694470 -0.0142677970  0.0580449076
+ [26,] -3.297432 1.982874 -0.0376398345  0.0785645161
+ [27,] -3.848207 1.900286  0.0007815828  0.1071275312
+ [28,] -3.620012 1.834429 -0.0118070114  0.1834368215
+ [29,] -4.455845 2.310515  0.0301545721 -0.1709065344
+ [30,] -4.315741 2.154216  0.0274607953 -0.1177325601
+ [31,] -3.886753 1.920993  0.0072453735  0.0656995630
+ [32,] -3.901644 1.940969  0.0163762550 -0.0921624259
+ [33,] -3.820574 2.097735 -0.0058176808  0.0494162027
+ [34,] -3.363064 1.934110 -0.0387013329  0.1597788898
+ [35,] -3.260449 1.894539 -0.0255013530 -0.0126192250
+ [36,] -3.553408 2.120243 -0.0119882915 -0.0833187326
+ [37,] -4.262745 2.039371  0.0280464876 -0.0900098157
+ [38,] -4.157141 2.080751  0.0189569375 -0.0288947242
+ [39,] -3.664428 1.892006 -0.0043908107  0.0728741609
+ [40,] -3.913592 1.894814  0.0152557538 -0.0402153675
+ [41,] -4.075338 1.958903  0.0238690281 -0.2750992435
+ [42,] -4.025896 1.963492  0.0111373808  0.0727085424
+ [43,] -3.963934 2.226198  0.0071519085 -0.1307066009
+ [44,] -4.130877 2.026902  0.0181570532  0.0284333104
+ [45,] -4.350700 2.301384  0.0166478458  0.0091077384
+ [46,] -4.085931 2.427944 -0.0089911837  0.0133516621
+ [47,] -3.653753 1.990066 -0.0072121736  0.0280552319
+ [48,] -3.762827 1.927817 -0.0125168469  0.0673951588
+ [49,] -4.043549 1.984057  0.0030694646  0.1296273775
+ [50,] -3.816593 1.809690  0.0042137985  0.1060707373
+ [51,] -4.359622 2.033469  0.0348853207 -0.0580824152
+ [52,] -4.142524 2.168032  0.0136873748 -0.0611954361
+ [53,] -4.264626 1.822670  0.0289066090  0.1428818314
+ [54,] -3.849294 1.927459 -0.0044926826  0.1273580016
+ [55,] -3.681649 1.760081 -0.0009735113  0.1413849899
+ [56,] -4.410264 2.272432  0.0308411264 -0.1331209164
+ [57,] -4.337921 2.114518  0.0302775116 -0.1036328650
+ [58,] -3.516103 2.192127 -0.0326579018  0.0286975225
+ [59,] -4.092043 1.986515  0.0139473532 -0.0375731544
+ [60,] -3.397159 1.788651 -0.0229504558  0.1494323454
+ [61,] -4.423409 2.262539  0.0360605301 -0.2238783120
+ [62,] -3.797159 1.787966 -0.0037748705  0.2080811229
+ [63,] -4.508723 2.246107  0.0270445725 -0.0020335427
+ [64,] -4.204808 2.058968  0.0130262425  0.0356693375
+ [65,] -3.853709 1.907226 -0.0006708558  0.1387996296
+ [66,] -4.466291 2.111169  0.0290607943  0.0742752505
+ [67,] -3.683341 1.938375 -0.0046947409 -0.0318408080
+ [68,] -4.019598 1.970874  0.0137223413 -0.0417332104
+ [69,] -4.009711 1.782730  0.0208086345  0.0557733892
+ [70,] -4.528716 2.246652  0.0412021044 -0.1634534913
+ [71,] -3.956980 2.383880 -0.0034807803 -0.0770532470
+ [72,] -3.484973 1.881953 -0.0108840859  0.0095392778
+ [73,] -4.133696 1.852164  0.0312444508 -0.0918041671
+ [74,] -3.506555 1.907926 -0.0167219964 -0.0107291941
+ [75,] -4.290217 2.019655  0.0220920159  0.0615322926
+ [76,] -3.954467 1.868270  0.0051971351  0.1614798344
+ [77,] -3.476407 1.748456 -0.0237310634  0.2389064639
+ [78,] -3.825824 1.873114  0.0181931440 -0.1565203633
+ [79,] -3.907331 2.052872  0.0112765617 -0.1900166905
+ [80,] -3.605213 2.049424 -0.0345245697  0.1461771267
+ [81,] -4.155201 1.841243  0.0346598167 -0.0617048989
+ [82,] -3.727692 2.014796 -0.0023856903 -0.0650093515
+ [83,] -3.607953 1.892598 -0.0136337304  0.1305294109
+ [84,] -3.675090 1.845412 -0.0167186468  0.2296331333
+ [85,] -4.162048 1.926217  0.0322484274 -0.0750707971
+ [86,] -4.093470 2.174194  0.0107141271 -0.0709721711
+ [87,] -3.980913 1.911345  0.0036186947  0.0408925959
+ [88,] -4.285528 1.959289  0.0368126914 -0.0844070700
+ [89,] -3.031477 1.852241 -0.0500311989  0.0404239797
+ [90,] -3.637787 1.732057 -0.0024385440  0.0473989186
+ [91,] -3.180785 1.887033 -0.0288562523 -0.0164425914
+ [92,] -4.544806 1.937739  0.0545552545 -0.1543166504
+ [93,] -4.085852 2.128163  0.0158874239 -0.2174867047
+ [94,] -4.020476 2.156723  0.0021609599  0.0021670375
+ [95,] -4.018620 2.040506  0.0120979938 -0.0951333712
+ [96,] -4.079545 2.099004  0.0219410042 -0.0905367635
+ [97,] -3.435007 1.787978 -0.0155004285  0.1361481082
+ [98,] -3.561048 1.968108 -0.0229436363  0.1229761159
+ [99,] -3.076540 2.058973 -0.0441195093 -0.0034899437
+[100,] -3.985474 2.256914 -0.0023376589 -0.0686156429
+[101,] -3.903553 2.121435 -0.0008777423 -0.0229370742
+[102,] -4.434936 2.187669  0.0322019912 -0.0708485874
+[103,] -3.672673 2.053819 -0.0094917336 -0.0795381541
+[104,] -3.808111 1.607360  0.0094548859  0.0518967507
+[105,] -3.699568 1.829992  0.0058774149 -0.1128277369
+[106,] -4.110095 2.091564 -0.0000375377  0.1955869413
+[107,] -4.402068 2.523003  0.0136290122 -0.1215733481
+[108,] -4.195461 2.088590  0.0130665627  0.1163844310
+[109,] -3.889197 1.755742  0.0120445036  0.0368687147
+[110,] -4.147959 1.784478  0.0304406206 -0.0015750267
+[111,] -4.391322 2.220341  0.0367590861 -0.1981945529
+[112,] -3.976565 1.669402  0.0082201392  0.2658839850
+[113,] -4.571743 2.161366  0.0440976633 -0.1482775520
+[114,] -4.083202 2.236519  0.0093444444 -0.1075139993
+[115,] -3.793554 1.967521  0.0071609284 -0.0163070076
+[116,] -3.922882 1.926778  0.0179754967 -0.2141695837
+[117,] -3.892694 2.104563  0.0021143731 -0.0895576292
+[118,] -4.145964 2.059925  0.0282932145 -0.1883674190
+[119,] -4.242582 2.222207  0.0237376689 -0.1968075984
+[120,] -3.761841 2.026759 -0.0002975392  0.0152405730
+[121,] -3.779749 1.928839 -0.0071437152  0.0986360169
+[122,] -3.819424 1.877529 -0.0008922861  0.0908299504
+[123,] -3.715786 1.960485 -0.0014990924 -0.0994485617
+[124,] -4.434925 2.339653  0.0239300368 -0.0765613582
+[125,] -3.671867 1.761925 -0.0071051389  0.1988688194
+[126,] -3.715812 1.734406 -0.0062680721  0.1402323546
+[127,] -4.008679 2.115599  0.0032226946  0.0416174407
+[128,] -3.481143 1.987036 -0.0271536929 -0.0118873087
+[129,] -3.148380 1.699382 -0.0265578287 -0.0143462480
+[130,] -3.507072 2.086117 -0.0224878291  0.1010694128
+[131,] -3.917694 1.977885  0.0198741986 -0.1069876705
+[132,] -3.121795 1.987855 -0.0411207789  0.0647262779
+[133,] -3.843489 2.065314  0.0057036016 -0.1053509296
+[134,] -3.920884 2.179786 -0.0001005966  0.0013829452
+[135,] -3.915822 2.002803  0.0084700648  0.0573771017
+[136,] -3.801450 1.953476 -0.0030397341  0.0287361304
+[137,] -3.520934 1.993618 -0.0103603539  0.0328815730
+[138,] -4.199784 2.019430  0.0209050450  0.0731358909
+[139,] -3.780695 2.005142 -0.0046989340 -0.0564401381
+[140,] -4.208392 2.060217  0.0296705751 -0.1073392971
+[141,] -4.116906 2.019258  0.0269673224 -0.1568874700
+[142,] -4.243779 2.064840  0.0189394427  0.0001212627
+[143,] -2.879812 1.876944 -0.0684537148  0.0933299626
+[144,] -4.190288 2.080087  0.0206166098 -0.0440546193
+[145,] -3.626073 1.960052 -0.0264375959  0.2136216522
+[146,] -2.885283 2.096357 -0.0733593297 -0.0085869273
+[147,] -3.542792 1.767327 -0.0124042811 -0.1644024080
+[148,] -4.369103 2.217415  0.0254617743 -0.0667844994
+[149,] -4.079255 2.066284  0.0068987524  0.0927229921
+[150,] -3.990342 1.743835  0.0139781576  0.0070180847
+[151,] -3.657467 2.032110 -0.0161878716 -0.0468570824
+[152,] -4.192947 2.240063  0.0218922880 -0.2732948541
+[153,] -3.700082 1.876199 -0.0096716924  0.1505279903
+[154,] -3.970716 2.061188  0.0075854072  0.0159024271
+[155,] -4.314495 2.365198  0.0067803137  0.0040833767
+[156,] -3.802542 2.026403 -0.0082014875  0.1131080486
+[157,] -4.069934 1.984831  0.0180204475 -0.0175356399
+[158,] -4.101691 2.052842  0.0143687690 -0.0091223591
+[159,] -3.608110 2.088106 -0.0178650906  0.0897832378
+[160,] -4.207335 2.337813  0.0027299124  0.0145586829
+[161,] -3.569447 1.875063 -0.0283685803  0.2496766899
+[162,] -4.107162 1.921263  0.0229863440 -0.0767836767
+[163,] -4.254442 2.066254  0.0207654436 -0.1006889142
+[164,] -3.147477 1.894580 -0.0407241041  0.1077805717
+[165,] -3.565210 1.711385 -0.0192561635  0.2637169567
+[166,] -3.444618 2.205786 -0.0432826225  0.1043937353
+[167,] -4.201496 2.168958  0.0204138160 -0.1332084465
+[168,] -3.570101 1.985289 -0.0144091449  0.0884066384
+[169,] -4.201928 2.144558  0.0285858600 -0.2126752931
+[170,] -4.566493 2.369111  0.0361048624 -0.1689518570
+[171,] -3.952123 2.177649 -0.0061135127  0.0462869726
+[172,] -3.535066 1.936664 -0.0080223029 -0.2115970830
+[173,] -4.404922 2.057992  0.0420044035 -0.1829306136
+[174,] -3.854445 2.025593  0.0047728694 -0.1504051580
+[175,] -3.350883 2.118975 -0.0458550918  0.0297806656
+[176,] -4.268419 2.184406  0.0252863116 -0.0705609881
+[177,] -4.030304 2.001537  0.0114031936  0.0628631641
+[178,] -3.862703 1.998675 -0.0017139074  0.0210908361
+[179,] -4.049160 1.902539  0.0159565490 -0.0695880291
+[180,] -3.192662 2.003428 -0.0539228707 -0.0163197278
+[181,] -3.552161 2.043351 -0.0361101036  0.1423351173
+[182,] -3.827976 1.993855 -0.0079994960  0.0911413387
+[183,] -4.123843 1.949741  0.0151535826  0.0209487069
+[184,] -4.010950 2.071583  0.0041822094  0.1147200239
+[185,] -4.221004 2.036502  0.0185389160  0.0091032974
+[186,] -4.105852 1.696941  0.0350481682 -0.0528789966
+[187,] -3.789425 1.900286 -0.0022024571  0.1244677084
+[188,] -4.634316 2.040124  0.0611992619 -0.2575427976
+[189,] -3.759636 1.915077  0.0071006934 -0.0163730627
+[190,] -3.869758 2.208371 -0.0108016005 -0.0085517187
+[191,] -4.255446 2.198569  0.0212705572 -0.1382876412
+[192,] -3.529323 2.075599 -0.0168944914 -0.0968908053
+[193,] -3.715227 1.701025 -0.0054244006  0.2460177454
+[194,] -4.126997 1.827248  0.0268136831  0.0364735737
+[195,] -4.219242 2.243607  0.0121626098 -0.0901957655
+[196,] -4.409023 2.170774  0.0370432049 -0.1417218004
+[197,] -3.859932 1.811157  0.0140690595 -0.0967956474
+[198,] -3.794738 1.846589 -0.0066948975  0.1051105865
+[199,] -4.428619 2.253276  0.0281939011 -0.1274562638
+[200,] -4.571251 2.311028  0.0424127362 -0.1641499999
+> 
+> # compare mean-values
+> ergm_mv_est_tapered = foreach(i = 1:nsims, .combine = rbind) %dorng% {
++ #ergm_mv_est_tapered <- simulate(g_sim[[1]] ~ edges+nodematch("x")+ kstar(2) + triangles,
++ simulate(g_sim[[i]] ~ edges+nodematch("x")+ kstar(2) + triangles,
++                nsim = 10,
++                control=control.simulate.formula(MCMC.burnin=100000, MCMC.interval=10000),
++                coef = ergm_sim_estim_tapered[i,],         
++                output = "stats"
++ )
++ }
+> colMeans(g_sim_stats)
+      edges nodematch.x      kstar2    triangle 
+   392.1395    340.4010   3076.3440    116.8350 
+> ergm_mv_tapered = colMeans(ergm_mv_est_tapered)
+> ergm_mv_tapered
+      edges nodematch.x      kstar2    triangle 
+   410.2655    349.5025   4759.5070    647.5565 
+> 
+> # Model statistics ‘kstar2’ and ‘triangle’ are not varying. This may indicate 
+> # that the observed data occupies an extreme point in the sample space or that 
+> # the estimation has reached a dead-end configuration.
+> # Warning: Model statistics ‘nodematch.x’ are linear combinations of some set of 
+> # preceding statistics at the current stage of the estimation. This may indicate 
+> # that the model is nonidentifiable.
+> # Error in ergm.MCMLE(init, nw, model, initialfit = (initialfit <- NULL),  : 
+> # Unconstrained MCMC sampling did not mix at all. Optimization cannot continue.
+> # In addition: Warning message:
+> # In ergm_MCMC_sample(s, control, theta = mcmc.init, verbose = max(verbose -  :
+> # Unable to reach target effective size in iterations alotted.
+> 
+> 
+> ##################
+> #                #
+> #     MFERGM     #
+> #                #
+> ##################
+> 
+> # Use "theta" on mfergm instead
+> tobs <- data.frame(matrix(NA, ncol = 4, nrow = nsims))
+> names(tobs) <- c("edges", "x", "kstar2", "triangles")
+> for (i in 1:nsims) 
++ {
++   tobs[i,] = g_sim_stats[i,] / (c((n^2)/2, (n^2)/2, (n^3)/2 , (n^3)/2 ))  
++ }
+> 
+> ### Compute MFERGM Results
+> mfergm_estim <- NULL
+> # Double loop to reduce memory use
+> for(j in 1:(nsims/100)){
++  mfergm_estim_j = foreach(i = (100*(j-1)+(1:100)), .combine = rbind) %dorng% {
++   pars <- init_params[i,] * c(.5,.5,n,n)
++   addpars <- list(n=n, tobs = tobs[i,], x=x, ninit=1)
++   cd.est <- tryCatch(optimx(pars, fn = loglikmf.model5, 
++                             method = "BFGS", 
++                             control = list(fnscale = -1), addpars = addpars), 
++                      error = function(e) {return(c(NA, NA, NA, NA))})
++   as.numeric(cd.est[1:4])
++  }
++  mfergm_estim <- rbind(mfergm_estim, mfergm_estim_j)
++ }
+> mfergm_estim = matrix(c(mfergm_estim[,1]*2, mfergm_estim[,2]*2, mfergm_estim[,3]/n, mfergm_estim[,4]/n),
++                nrow = nsims)
+> mfergm_result_med = apply(mfergm_estim, 2, median, na.rm = T) 
+> mfergm_result = apply(mfergm_estim, 2, mean, na.rm = T) 
+> cbind(theta,mfergm_result_med,mfergm_result)
+     theta mfergm_result_med mfergm_result
+[1,] -4.00     -3.9801025196   -13.3243945
+[2,]  2.00      2.0858141591     6.5488796
+[3,]  0.01     -0.0001600468    -0.2788776
+[4,]  0.01     -0.0148869551    -0.1998905
+> 
+> #### DEGENERACIES
+> degen_mfergm = which(!complete.cases(mfergm_estim))
+> # 58 of em
+> degen_mfergm
+[1] 100 103 108 117 137 159
+> 
+> if(length(degen_mfergm) > 0){
++ # Replace with MPLE
++ for(i in 1:length(degen_mfergm)){
++   mfergm_estim[degen_mfergm[i],] <- init_params[degen_mfergm[i],]
++ }
++ }
+> 
+> # compare mean values
+> mf_mv_est = foreach(i = 1:nsims, .combine = rbind) %dorng% {
++  simulate(g_sim[[i]] ~ edges+nodematch("x")+ kstar(2) + triangles,
++                nsim = 10,
++                control=control.simulate.formula(MCMC.burnin=100000, MCMC.interval=10000),
++                coef =  mfergm_estim[i,],    
++                output = "stats"
++ )
++ }
+> mfergm_mv = colMeans(mf_mv_est)
+> mfergm_mv
+      edges nodematch.x      kstar2    triangle 
+   813.3995    569.2835  27397.7650   5326.5105 
+> 
+> # compare mean values
+> MPLE_mv_est = foreach(i = 1:nsims, .combine = rbind) %dorng% {
++  simulate(g_sim[[i]] ~ edges+nodematch("x")+ kstar(2) + triangles,
++                nsim = 10,
++                coef = init_params[i,],    
++                control=control.simulate.formula(MCMC.burnin=100000, MCMC.interval=10000),
++                output = "stats"
++ )
++ }
+> stopImplicitCluster()
+> colMeans(g_sim_stats)
+      edges nodematch.x      kstar2    triangle 
+   392.1395    340.4010   3076.3440    116.8350 
+> MPLE_mv = colMeans(MPLE_mv_est)
+> MPLE_result = apply(init_params, 2, mean, na.rm = T) 
+> 
+> mean_est <- cbind(theta, ergm_result_tapered, MPLE_result, mfergm_result)
+> rownames(mean_est) <- names(ergm_mv_tapered)
+> colnames(mean_est) <- c("true", "MCMC-MLE","MPLE","MFVLE")
+> mean_est
+             true      MCMC-MLE         MPLE       MFVLE
+edges       -4.00 -3.9054734774 -3.908518350 -13.3243945
+nodematch.x  2.00  2.0096943730  2.009741029   6.5488796
+kstar2       0.01  0.0034871947  0.003570523  -0.2788776
+triangle     0.01 -0.0002658004  0.001024539  -0.1998905
+> 
+> mean_mv_est <- cbind(round(colMeans(g_sim_stats), 2), round(ergm_mv_tapered,2), round(MPLE_mv,2), round(mfergm_mv, 2))
+> rownames(mean_mv_est) <- names(ergm_mv_tapered)
+> colnames(mean_mv_est) <- c("true", "MCMC-MLE","MPLE", "MFVLE")
+> mean_mv_est
+               true MCMC-MLE    MPLE    MFVLE
+edges        392.14   410.27  407.10   813.40
+nodematch.x  340.40   349.50  348.34   569.28
+kstar2      3076.34  4759.51 4370.29 27397.76
+triangle     116.83   647.56  514.03  5326.51
+> 
+> hist(ergm_sim_estim_tapered[,4], main = NULL, xlab = "Triangle")
+> hist(mfergm_estim[,4], main = NULL, xlab = "Triangle")
+> 
+> 
+> outliers <- function(x, field = 1.5, na.rm = TRUE) 
++ {
++   qnt <- quantile(x, probs=c(.25, .75), na.rm = na.rm)
++   H <- field * IQR(x, na.rm = na.rm)
++   which(x < (qnt[1] - H) | x > (qnt[2] + H))
++ }
+> 
+> 
+> 
+> a  = is.na(ergm_sim_estim_tapered[,4])
+> b  = is.na(mfergm_estim[,4])
+> c = mfergm_estim[(!a)&(!b),]
+> c1 = c[,4]
+> d = ergm_sim_estim_tapered[(!a)&(!b),]
+> d1 = d[,4]
+> c1[c1 < -2] = d1[c1 < -2]
+> plot(c1~d1, col = (c1 == d1) + 1, pch = 16)
+> sum(c1 == d1)
+[1] 6
+> 
+> f = c[-Reduce(union, list(outliers(c[,1], 0.6), outliers(c[,2], 0.3), outliers(c[,3], 1.5), outliers(c[,4], 1.5))),]
+> 
+> 
+> 
+> gtest_mf = matrix(nrow = nrow(c), ncol = 4)
+> for (i in 1:nrow(c))
++ {
++   gtest_mf[i,] = simulate(g_sim[[i]] ~ edges+nodematch("x")+ kstar(2) + triangles, 
++                           nsim = 1,
++                           coef = c[i,],        
++                           output = "stats")
++ }
+> gtest_mc_tapered = matrix(nrow = nrow(d), ncol = 4)
+> for (i in 1:nrow(d))
++ {
++   gtest_mc_tapered[i,] = as.vector(simulate(g_sim[[i]] ~ edges+nodematch("x")+ kstar(2) + triangles, 
++                           nsim = 1,
++                           coef = d[i,],        
++                           output = "stats"))
++ }
+> colMeans(gtest_mf)
+[1]   769.11   543.55 22464.50  3744.20
+> colMeans(gtest_mc_tapered)
+[1]  398.445  344.360 3170.495  119.960
+> 
+> summary(ergm_sim_estim_tapered)
+       V1               V2              V3                  V4            
+ Min.   :-4.634   Min.   :1.607   Min.   :-0.073359   Min.   :-0.2750992  
+ 1st Qu.:-4.150   1st Qu.:1.895   1st Qu.:-0.008995   1st Qu.:-0.0896707  
+ Median :-3.915   Median :2.000   Median : 0.004493   Median :-0.0007269  
+ Mean   :-3.905   Mean   :2.010   Mean   : 0.003487   Mean   :-0.0002658  
+ 3rd Qu.:-3.683   3rd Qu.:2.115   3rd Qu.: 0.019889   3rd Qu.: 0.0789881  
+ Max.   :-2.880   Max.   :2.523   Max.   : 0.061199   Max.   : 0.3480051  
+> summary(gtest_mf)
+       V1               V2               V3               V4          
+ Min.   :  16.0   Min.   :   0.0   Min.   :     4   Min.   :    0.00  
+ 1st Qu.: 368.8   1st Qu.: 281.5   1st Qu.:  2713   1st Qu.:   71.75  
+ Median : 453.5   Median : 364.0   Median :  4171   Median :  140.00  
+ Mean   : 769.1   Mean   : 543.5   Mean   : 22464   Mean   : 3744.20  
+ 3rd Qu.: 988.2   3rd Qu.: 606.2   3rd Qu.: 19096   3rd Qu.:  645.75  
+ Max.   :4075.0   Max.   :2102.0   Max.   :328698   Max.   :90191.00  
+> summary(gtest_mc_tapered)
+       V1              V2              V3             V4       
+ Min.   :313.0   Min.   :271.0   Min.   :1963   Min.   : 50.0  
+ 1st Qu.:376.8   1st Qu.:324.8   1st Qu.:2799   1st Qu.: 99.0  
+ Median :400.5   Median :342.0   Median :3144   Median :118.0  
+ Mean   :398.4   Mean   :344.4   Mean   :3170   Mean   :120.0  
+ 3rd Qu.:419.0   3rd Qu.:363.0   3rd Qu.:3456   3rd Qu.:140.2  
+ Max.   :469.0   Max.   :415.0   Max.   :4417   Max.   :207.0  
+> summary(g_sim_stats)
+     edges        nodematch.x        kstar2        triangle    
+ Min.   :329.0   Min.   :281.0   Min.   :2167   Min.   : 57.0  
+ 1st Qu.:379.0   1st Qu.:329.0   1st Qu.:2867   1st Qu.:102.0  
+ Median :392.0   Median :341.0   Median :3067   Median :115.5  
+ Mean   :392.1   Mean   :340.4   Mean   :3076   Mean   :116.8  
+ 3rd Qu.:405.0   3rd Qu.:352.0   3rd Qu.:3276   3rd Qu.:130.0  
+ Max.   :468.0   Max.   :402.0   Max.   :4397   Max.   :188.0  
+> 
+> 
+> gtest_mf_tri = gtest_mf[gtest_mf[,4]<60, 4]
+> 
+> hist(ergm_sim_estim_tapered[,1])
+> hist(ergm_sim_estim_tapered[,2])
+> hist(ergm_sim_estim_tapered[,3])
+> hist(ergm_sim_estim_tapered[,4])
+> hist(f[,1])
+> hist(f[,2])
+> hist(f[,3])
+> hist(f[,4])
+> 
+> 
+> gtest_mf_rm = gtest_mf[-Reduce(union, list(outliers(gtest_mf[,1], 0.7), outliers(gtest_mf[,2], 1), 
++                                            outliers(gtest_mf[,3], 0.001), outliers(gtest_mf[,4], 0.001))),]
+> hist(gtest_mf[,1])
+> hist(gtest_mf[,2])
+> hist(gtest_mf[,3])
+> hist(gtest_mf[,4])
+> 
+> hist(ergm_sim_estim_tapered[,1])
+> hist(ergm_sim_estim_tapered[,2])
+> hist(ergm_sim_estim_tapered[,3])
+> hist(ergm_sim_estim_tapered[,4])
+> 
+> # First natural params
+> complete_mf_results = mfergm_estim[complete.cases(mfergm_estim),]
+> complete_tapered_results = ergm_sim_estim_tapered[complete.cases(ergm_sim_estim_tapered),]
+> complete_MPLE_results = init_params[complete.cases(init_params),]
+> 
+> bdrmse <- function(comp, theta, degen){
++  outliers1 = union(outliers((comp[,1] - theta[1])^2), degen)
++  outliers2 = union(outliers((comp[,2] - theta[2])^2), degen)
++  outliers3 = union(outliers((comp[,3] - theta[3])^2), degen)
++  outliers4 = union(outliers((comp[,4] - theta[4])^2), degen)
++  rmse1 <- ((comp[,1] - theta[1])^2)
++  rmse1[outliers1] <- max(rmse1[-outliers1])
++  rmse2 <- ((comp[,2] - theta[2])^2)
++  rmse2[outliers2] <- max(rmse2[-outliers2])
++  rmse3 <- ((comp[,3] - theta[3])^2)
++  rmse3[outliers3] <- max(rmse3[-outliers3])
++  rmse4 <- ((comp[,4] - theta[4])^2)
++  rmse4[outliers4] <- max(rmse4[-outliers4])
++  c(sqrt(mean(rmse1)), sqrt(mean(rmse2)), sqrt(mean(rmse3)), sqrt(mean(rmse4)) ) 
++ }
+> bdmad <- function(comp, theta, degen){
++  outliers1 = union(outliers(abs(comp[,1] - theta[1])),degen)
++  outliers2 = union(outliers(abs(comp[,2] - theta[2])),degen)
++  outliers3 = union(outliers(abs(comp[,3] - theta[3])),degen)
++  outliers4 = union(outliers(abs(comp[,4] - theta[4])),degen)
++  mad1 <- (abs(comp[,1] - theta[1]))
++  mad1[outliers1] <- max(mad1[-outliers1])
++  mad2 <- (abs(comp[,2] - theta[2]))
++  mad2[outliers2] <- max(mad2[-outliers2])
++  mad3 <- (abs(comp[,3] - theta[3]))
++  mad3[outliers3] <- max(mad3[-outliers3])
++  mad4 <- (abs(comp[,4] - theta[4]))
++  mad4[outliers4] <- max(mad4[-outliers4])
++  c((mean(mad1)), (mean(mad2)), (mean(mad3)), (mean(mad4)) ) 
++ }
+> 
+> # Degeneracy
+> length(intersect(which(is.na(mfergm_estim[,1])), which(is.na(ergm_sim_estim_tapered[,1]))))
+[1] 0
+> 
+> # RMSE
+> 
+> MPLE_rmse <- bdrmse(complete_MPLE_results, theta,degen=NULL)
+> mf_rmse <- bdrmse(complete_mf_results, theta, degen_mfergm)
+> tapered_rmse <- bdrmse(complete_tapered_results, theta, degen_tapered)
+> 
+> # MAD
+> MPLE_mad <- bdmad(complete_MPLE_results, theta,degen=NULL)
+> mf_mad <- bdmad(complete_mf_results, theta, degen_mfergm)
+> tapered_mad <- bdmad(complete_tapered_results, theta, degen_tapered)
+> 
+> RMSE_natural_parameter <- cbind(round(tapered_rmse, 3), round(MPLE_rmse, 3), round(mf_rmse, 3))
+> rownames(RMSE_natural_parameter) <- names(mv_1)
+> colnames(RMSE_natural_parameter) <- c("MCMC-MLE","MPLE", "MFVLE")
+> # These are the RMSE of natural parameter estimates
+> RMSE_natural_parameter
+            MCMC-MLE  MPLE MFVLE
+edges          0.331 0.339 3.325
+nodematch.x    0.156 0.156 6.069
+kstar2         0.020 0.021 0.062
+triangle       0.111 0.111 0.148
+> 
+> MAD_natural_parameter <- cbind(round(tapered_mad, 3), round(MPLE_mad, 3), round(mf_mad, 3))
+> rownames(MAD_natural_parameter) <- names(mv_1)
+> colnames(MAD_natural_parameter) <- c("MCMC-MLE","MPLE", "MFVLE")
+> # These are the MAD of natural parameter estimates
+> MAD_natural_parameter
+            MCMC-MLE  MPLE MFVLE
+edges          0.290 0.291 3.113
+nodematch.x    0.133 0.131 4.875
+kstar2         0.018 0.018 0.054
+triangle       0.096 0.096 0.125
+> 
+> 
+> outliers1 = outliers((complete_tapered_results[,1] - theta[1])^2)
+> outliers2 = outliers((complete_tapered_results[,2] - theta[2])^2)
+> outliers3 = outliers((complete_tapered_results[,3] - theta[3])^2)
+> outliers4 = outliers((complete_tapered_results[,4] - theta[4])^2)
+> plot((complete_mf_results[,1] - theta[1])^2, pch = 19, ylab = "", xlab = "Simulated Networks")
+> plot((complete_mf_results[,2] - theta[2])^2, pch = 19, ylab = "", xlab = "Simulated Networks")
+> plot((complete_mf_results[,3] - theta[3])^2, pch = 19, ylab = "", xlab = "Simulated Networks")
+> plot((complete_mf_results[,4] - theta[4])^2, pch = 19, ylab = "", xlab = "Simulated Networks")
+> plot(((complete_mf_results[,1] - theta[1])^2)[-outliers1], pch = 19, ylab = "", xlab = "Simulated Networks")
+> plot(((complete_mf_results[,2] - theta[2])^2)[-outliers2], pch = 19, ylab = "", xlab = "Simulated Networks")
+> plot(((complete_mf_results[,3] - theta[3])^2)[-outliers3], pch = 19, ylab = "", xlab = "Simulated Networks")
+> plot(((complete_mf_results[,4] - theta[4])^2)[-outliers4], pch = 19, ylab = "", xlab = "Simulated Networks")
+> 
+> 
+> outliers1 = head(order((complete_mf_results[,1] - theta[1])^2, decreasing = T), n = 100)
+> outliers2 = head(order((complete_mf_results[,2] - theta[2])^2, decreasing = T), n = 100)
+> outliers3 = head(order((complete_mf_results[,3] - theta[3])^2, decreasing = T), n = 100)
+> outliers4 = head(order((complete_mf_results[,4] - theta[4])^2, decreasing = T), n = 100)
+> outliers_all = intersect(intersect(intersect(outliers1, outliers2), outliers3), outliers4)
+> 
+> 
+> plot(density(complete_mf_results[,1]), main = "")
+> plot(density(complete_mf_results[,2]), main = "")
+> plot(density(complete_mf_results[,3]), main = "")
+> plot(density(complete_mf_results[,4]), main = "")
+> 
+> 
+> # Now the mean values
+> complete_mf_results = mf_mv_est[complete.cases(mf_mv_est),]
+> complete_tapered_results = ergm_mv_est_tapered[complete.cases(ergm_mv_est_tapered),]
+> complete_MPLE_results = MPLE_mv_est[complete.cases(MPLE_mv_est),]
+> 
+> 
+> # Degeneracy
+> length(intersect(which(is.na(mf_mv_est[,1])), which(is.na(ergm_mv_est_tapered[,1]))))
+[1] 0
+> 
+> # MFERGM RMSE
+> 
+> outliers1 = outliers((complete_tapered_results[,1] - mv_s[1])^2)
+> outliers2 = outliers((complete_tapered_results[,2] - mv_s[2])^2)
+> outliers3 = outliers((complete_tapered_results[,3] - mv_s[3])^2)
+> outliers4 = outliers((complete_tapered_results[,4] - mv_s[4])^2)
+> plot((complete_mf_results[,1] - mv_s[1])^2, pch = 19, ylab = "", xlab = "Simulated Networks")
+> plot((complete_mf_results[,2] - mv_s[2])^2, pch = 19, ylab = "", xlab = "Simulated Networks")
+> plot((complete_mf_results[,3] - mv_s[3])^2, pch = 19, ylab = "", xlab = "Simulated Networks")
+> plot((complete_mf_results[,4] - mv_s[4])^2, pch = 19, ylab = "", xlab = "Simulated Networks")
+> plot(((complete_mf_results[,1] - mv_s[1])^2)[-outliers1], pch = 19, ylab = "", xlab = "Simulated Networks")
+> plot(((complete_mf_results[,2] - mv_s[2])^2)[-outliers2], pch = 19, ylab = "", xlab = "Simulated Networks")
+> plot(((complete_mf_results[,3] - mv_s[3])^2)[-outliers3], pch = 19, ylab = "", xlab = "Simulated Networks")
+> plot(((complete_mf_results[,4] - mv_s[4])^2)[-outliers4], pch = 19, ylab = "", xlab = "Simulated Networks")
+> 
+> plot(density(complete_mf_results[,1]), main = "")
+> plot(density(complete_mf_results[,2]), main = "")
+> plot(density(complete_mf_results[,3]), main = "")
+> plot(density(complete_mf_results[,4]), main = "")
+> 
+> # RMSE
+> 
+> MPLE_rmse <- bdrmse(complete_MPLE_results, mv_s, degen=NULL)
+> mf_rmse <- bdrmse(complete_mf_results, mv_s, degen_mfergm)
+> tapered_rmse <- bdrmse(complete_tapered_results, mv_s, degen_tapered)
+> 
+> # MAD
+> MPLE_mad <- bdmad(complete_MPLE_results, mv_s, degen=NULL)
+> mf_mad <- bdmad(complete_mf_results, mv_s, degen_mfergm)
+> tapered_mad <- bdmad(complete_tapered_results, mv_s, degen_tapered)
+> 
+> RMSE_mean_value_parameter <- cbind(round(tapered_rmse, 3), round(MPLE_rmse, 3), round(mf_rmse, 3))
+> rownames(RMSE_mean_value_parameter) <- names(mv_1)
+> colnames(RMSE_mean_value_parameter) <- c("MCMC-MLE","MPLE", "MFVLE")
+> # These are the RMSE of mean-value parameter estimates
+> RMSE_mean_value_parameter
+            MCMC-MLE    MPLE     MFVLE
+edges         27.567  27.948   486.132
+nodematch.x   25.453  25.349   297.667
+kstar2       441.675 446.940 12710.398
+triangle      28.149  28.791   388.225
+> 
+> MAD_mean_value_parameter <- cbind(round(tapered_mad, 3), round(MPLE_mad, 3), round(mf_mad, 3))
+> rownames(MAD_mean_value_parameter) <- names(mv_1)
+> colnames(MAD_mean_value_parameter) <- c("MCMC-MLE","MPLE", "MFVLE")
+> # These are the MAD of mean-value parameter estimates
+> MAD_mean_value_parameter
+            MCMC-MLE    MPLE     MFVLE
+edges         23.448  23.601   383.690
+nodematch.x   21.506  21.560   268.771
+kstar2       374.959 378.181 10438.979
+triangle      24.176  24.649   298.973
+> 
+> plot(mfergm_estim[,4],ergm_sim_estim_tapered[,4])
+> 
+> save.image("mfergm_params10_n1000.RData")
+> 
+> # Summary
+> length(degen_tapered) / nsims
+[1] 0.01
+> length(degen_mfergm) / nsims
+[1] 0.03
+> # These are the RMSE of natural parameter estimates
+> RMSE_natural_parameter
+            MCMC-MLE  MPLE MFVLE
+edges          0.331 0.339 3.325
+nodematch.x    0.156 0.156 6.069
+kstar2         0.020 0.021 0.062
+triangle       0.111 0.111 0.148
+> # These are the MAD of natural parameter estimates
+> MAD_natural_parameter
+            MCMC-MLE  MPLE MFVLE
+edges          0.290 0.291 3.113
+nodematch.x    0.133 0.131 4.875
+kstar2         0.018 0.018 0.054
+triangle       0.096 0.096 0.125
+> # These are the RMSE of mean-value parameter estimates
+> RMSE_mean_value_parameter
+            MCMC-MLE    MPLE     MFVLE
+edges         27.567  27.948   486.132
+nodematch.x   25.453  25.349   297.667
+kstar2       441.675 446.940 12710.398
+triangle      28.149  28.791   388.225
+> # These are the RMSE of mean-value parameter estimates
+> MAD_mean_value_parameter
+            MCMC-MLE    MPLE     MFVLE
+edges         23.448  23.601   383.690
+nodematch.x   21.506  21.560   268.771
+kstar2       374.959 378.181 10438.979
+triangle      24.176  24.649   298.973
+> 
+> proc.time()
+    user   system  elapsed 
+2562.762   56.755  589.810 

@@ -1,0 +1,105 @@
+> rm(list=ls())
+> my.seed=3141
+> set.seed(my.seed)
+> 
+> library(ergm)
+Loading required package: network
+
+‘network’ 1.18.0 (2022-10-05), part of the Statnet Project
+* ‘news(package="network")’ for changes since last version
+* ‘citation("network")’ for citation information
+* ‘https://statnet.org’ for help, support, and other information
+
+
+‘ergm’ 4.3-6983 (2022-08-20), part of the Statnet Project
+* ‘news(package="ergm")’ for changes since last version
+* ‘citation("ergm")’ for citation information
+* ‘https://statnet.org’ for help, support, and other information
+
+‘ergm’ 4 is a major update that introduces some backwards-incompatible
+changes. Please type ‘news(package="ergm")’ for a list of major
+changes.
+
+> library(doRNG)
+Loading required package: foreach
+Loading required package: rngtools
+> library(mfergm)
+> library(optimx)     # mfergm likelihood
+> library(R.utils)    # set time on ergm
+Loading required package: R.oo
+Loading required package: R.methodsS3
+R.methodsS3 v1.8.2 (2022-06-13 22:00:14 UTC) successfully loaded. See ?R.methodsS3 for help.
+R.oo v1.25.0 (2022-06-12 02:20:02 UTC) successfully loaded. See ?R.oo for help.
+
+Attaching package: ‘R.oo’
+
+The following object is masked from ‘package:R.methodsS3’:
+
+    throw
+
+The following objects are masked from ‘package:methods’:
+
+    getClasses, getMethods
+
+The following objects are masked from ‘package:base’:
+
+    attach, detach, load, save
+
+R.utils v2.12.0 (2022-06-28 03:20:05 UTC) successfully loaded. See ?R.utils for help.
+
+Attaching package: ‘R.utils’
+
+The following object is masked from ‘package:utils’:
+
+    timestamp
+
+The following objects are masked from ‘package:base’:
+
+    cat, commandArgs, getOption, isOpen, nullfile, parse, warnings
+
+> library(doParallel) # parallel loops using 'foreach'
+Loading required package: iterators
+Loading required package: parallel
+> 
+> #####################################################################
+> #                                                                   #
+> #     Create High Transitivity ERGM Params (using ERGM fitting)     #
+> #                                                                   #
+> #####################################################################
+> 
+> nsims       =  1000                               # number of networks simulated
+> n           =  100                               # number of nodes
+> mv_1 <- c(400.31, 349.88, 3254.42,     126.28)   # mean-value parameters standard model
+> theta       =  c(-2,1,1,1) * c(2,2,1/n,1/n)      # true parameters for model 2
+> ##################
+> #                #
+> #     Set-up     #
+> #                #
+> ##################
+> 
+> load("sim10.RData")
+> theta
+[1] -4.00  2.00  0.01  0.01
+> set.seed(my.seed)
+> registerDoParallel(10)
+> g_sim_stats = foreach(i = 1:10, .combine = rbind) %dorng% {
++  simulate(sim ~ edges + nodematch("x") + kstar(2) + triangles, 
++                   nsim = 100*nsims,
++                   coef = theta,
++                   output = "stats",
++ 		  control=control.simulate.formula(MCMC.burnin=1000000, MCMC.interval=100000)
++                               )
++ }
+> apply(g_sim_stats,2,mean)
+      edges nodematch.x      kstar2    triangle 
+   393.0512    341.0188   3092.0576    117.4754 
+> cbind(mv_1, apply(g_sim_stats,2,mean))
+               mv_1          
+edges        400.31  393.0512
+nodematch.x  349.88  341.0188
+kstar2      3254.42 3092.0576
+triangle     126.28  117.4754
+> 
+> proc.time()
+     user    system   elapsed 
+33246.876   125.487  3355.076 

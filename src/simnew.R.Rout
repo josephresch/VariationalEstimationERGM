@@ -1,0 +1,107 @@
+> rm(list=ls())
+> my.seed=1
+> set.seed(my.seed)
+> 
+> library(ergm.tapered)
+Loading required package: ergm
+Loading required package: network
+
+‘network’ 1.18.0 (2022-10-05), part of the Statnet Project
+* ‘news(package="network")’ for changes since last version
+* ‘citation("network")’ for citation information
+* ‘https://statnet.org’ for help, support, and other information
+
+
+‘ergm’ 4.3-6983 (2022-08-20), part of the Statnet Project
+* ‘news(package="ergm")’ for changes since last version
+* ‘citation("ergm")’ for citation information
+* ‘https://statnet.org’ for help, support, and other information
+
+‘ergm’ 4 is a major update that introduces some backwards-incompatible
+changes. Please type ‘news(package="ergm")’ for a list of major
+changes.
+
+> library(doRNG)
+Loading required package: foreach
+Loading required package: rngtools
+> library(mfergm)
+> library(optimx)      # mfergm likelihood
+> library(R.utils)     # set time on ergm
+Loading required package: R.oo
+Loading required package: R.methodsS3
+R.methodsS3 v1.8.2 (2022-06-13 22:00:14 UTC) successfully loaded. See ?R.methodsS3 for help.
+R.oo v1.25.0 (2022-06-12 02:20:02 UTC) successfully loaded. See ?R.oo for help.
+
+Attaching package: ‘R.oo’
+
+The following object is masked from ‘package:R.methodsS3’:
+
+    throw
+
+The following objects are masked from ‘package:methods’:
+
+    getClasses, getMethods
+
+The following objects are masked from ‘package:base’:
+
+    attach, detach, load, save
+
+R.utils v2.12.1 (2022-10-30 22:12:37 UTC) successfully loaded. See ?R.utils for help.
+
+Attaching package: ‘R.utils’
+
+The following object is masked from ‘package:utils’:
+
+    timestamp
+
+The following objects are masked from ‘package:base’:
+
+    cat, commandArgs, getOption, isOpen, nullfile, parse, warnings
+
+> library(doParallel)  # parallel loops using 'foreach'
+Loading required package: iterators
+Loading required package: parallel
+> 
+> load("sim_model1_n100_increased.RData")
+> ls()
+[1] "my.seed" "sim"    
+> 
+> mv_1        =  c(393.0512, 341.0188, 3092.0576, 1.5*117.4754)
+> theta = c(-3.0989464,   1.5654049,  -0.0625170,   0.5898891) 
+> theta = c(-3.01074016, 1.53137208, -0.06704853, 0.60209288)
+> theta = c(-3.022, 1.53, -0.0663, 0.60)
+> 
+> names(theta) <- names(summary(sim ~ edges+nodematch("x")+ kstar(2) + triangles))
+> names(mv_1) <- names(summary(sim ~ edges+nodematch("x")+ kstar(2) + triangles))
+> 
+> ### test out sim and theta
+> test_sim <- simulate_ergm.tapered(sim ~ edges+nodematch("x")+ kstar(2) + triangles,
++                              nsim = 100000,
++                              tapering.centers=mv_1, tau=0.25/mv_1,
++                              control=control.simulate.formula(parallel=10,MCMC.burnin=1000000, MCMC.interval=10000),
++                              coef = theta,
++                              output = "stats")
+> 
+> #                                         #1
+> #                theta           mv_1          
+> # edges       -3.0989464  379  393.0512  392.9802
+> # nodematch.x  1.5654049  331  341.0188  342.0167
+> # kstar2      -0.0625170 2837 3092.0576 3093.2289
+> # triangle     0.5898891  143  176.2131  176.9745
+> 
+> #                                     #2                             
+> # edges       -3.01074016  393.0512  393.6422
+> # nodematch.x  1.53137208  341.0188  341.1893
+> # kstar2      -0.06704853 3092.0576 3092.6556
+> # triangle     0.60209288  176.2131  176.5332
+> 
+> cbind(theta,summary(sim ~ edges+nodematch("x")+ kstar(2) + triangles),mv_1,colMeans(test_sim))
+              theta           mv_1         
+edges       -3.0220  379  393.0512  393.514
+nodematch.x  1.5300  331  341.0188  340.965
+kstar2      -0.0663 2837 3092.0576 3092.555
+triangle     0.6000  143  176.2131  176.348
+> 
+> proc.time()
+   user  system elapsed 
+  1.069   0.137  46.777 

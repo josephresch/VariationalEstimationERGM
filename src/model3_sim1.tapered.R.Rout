@@ -1,0 +1,2762 @@
+> rm(list=ls())
+> my.seed=1000
+> set.seed(my.seed)
+> 
+> pdf("model3_sim1.tapered.pdf")
+> 
+> library(ergm.tapered)
+Loading required package: ergm
+Loading required package: network
+
+‘network’ 1.18.0 (2022-10-05), part of the Statnet Project
+* ‘news(package="network")’ for changes since last version
+* ‘citation("network")’ for citation information
+* ‘https://statnet.org’ for help, support, and other information
+
+
+‘ergm’ 4.3-6983 (2022-08-20), part of the Statnet Project
+* ‘news(package="ergm")’ for changes since last version
+* ‘citation("ergm")’ for citation information
+* ‘https://statnet.org’ for help, support, and other information
+
+‘ergm’ 4 is a major update that introduces some backwards-incompatible
+changes. Please type ‘news(package="ergm")’ for a list of major
+changes.
+
+> library(mfergm)
+> library(optimx)     # mfergm likelihood
+> library(R.utils)    # set time on ergm
+Loading required package: R.oo
+Loading required package: R.methodsS3
+R.methodsS3 v1.8.2 (2022-06-13 22:00:14 UTC) successfully loaded. See ?R.methodsS3 for help.
+R.oo v1.25.0 (2022-06-12 02:20:02 UTC) successfully loaded. See ?R.oo for help.
+
+Attaching package: ‘R.oo’
+
+The following object is masked from ‘package:R.methodsS3’:
+
+    throw
+
+The following objects are masked from ‘package:methods’:
+
+    getClasses, getMethods
+
+The following objects are masked from ‘package:base’:
+
+    attach, detach, load, save
+
+R.utils v2.12.0 (2022-06-28 03:20:05 UTC) successfully loaded. See ?R.utils for help.
+
+Attaching package: ‘R.utils’
+
+The following object is masked from ‘package:utils’:
+
+    timestamp
+
+The following objects are masked from ‘package:base’:
+
+    cat, commandArgs, getOption, isOpen, nullfile, parse, warnings
+
+> library(doParallel) # parallel loops using 'foreach'
+Loading required package: foreach
+Loading required package: iterators
+Loading required package: parallel
+> 
+> #####################################################################
+> #                                                                   #
+> #     Create High Transitivity ERGM Params (using ERGM fitting)     #
+> #                                                                   #
+> #####################################################################
+> 
+> nsims       =  100                              # number of networks simulated
+> n           =  100                                # number of nodes
+> #theta       =  c(-3,2,1,3) * c(2,2,1/n,1/n)      # true parameters for model 2
+> theta       =  c(-3.764,1.882,-0.017,0.327)      # true parameters for model 3
+> 
+> 
+> ##################
+> #                #
+> #     Set-up     #
+> #                #
+> ##################
+> 
+> g <- initialize.network(theta, n, directed = FALSE)
+> x <- rbinom(n, 1, 0.5) # attributes
+> set.vertex.attribute(g, # the name of the network object
++                      "x", # the name we want to reference the variable by in that object
++                      x # the value we are giving that variable
++ ) 
+> 
+> # Simulated networks 'g_sim' used for both ERGM and MFERGM
+> g_sim <- simulate(g ~ edges + nodematch("x") + kstar(2) + triangles, 
++                   nsim = nsims,
++                   coef = theta
++ )
+> 
+> # Extract summary stats from 'g_sim'
+> g_sim_stats = matrix(nrow = nsims, ncol = 4)
+> for (i in 1:nsims)
++ {
++   g_sim_stats[i,] = summary_formula(g_sim[[i]] ~ edges + nodematch("x") + kstar(2) + triangles)
++ }
+> 
+> 
+> # asdf_index = g_sim_stats[,1] > mean(g_sim_stats[,1]) - sd(g_sim_stats[,1]) & g_sim_stats[,1] < mean(g_sim_stats[,1]) + sd(g_sim_stats[,1]) &
+> #              g_sim_stats[,2] > mean(g_sim_stats[,2]) - sd(g_sim_stats[,2]) & g_sim_stats[,2] < mean(g_sim_stats[,2]) + sd(g_sim_stats[,2]) &
+> #              g_sim_stats[,3] > mean(g_sim_stats[,3]) - sd(g_sim_stats[,3]) & g_sim_stats[,3] < mean(g_sim_stats[,3]) + sd(g_sim_stats[,3]) &
+> #              g_sim_stats[,4] > mean(g_sim_stats[,4]) - sd(g_sim_stats[,4]) & g_sim_stats[,4] < mean(g_sim_stats[,4]) + sd(g_sim_stats[,4])
+> # 
+> # asdf = g_sim_stats[asdf_index,]
+> # g_sim_stats = asdf
+> # nsims = nrow(asdf)
+> # g_sim = g_sim[which(asdf_index)]
+> 
+> 
+> 
+> # Initialize the parameters at MPLE
+> init_params = matrix(nrow = nsims, ncol = length(theta))
+> for (i in 1:nsims)
++ {
++   init_params[i,] = ergm(g_sim[[i]] ~ edges + nodematch("x") + kstar(2) + triangles, 
++                          estimate = "MPLE")$coefficients
++ }
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+Evaluating log-likelihood at the estimate. 
+> 
+> 
+> ##########################
+> #                        #
+> #     ERGM (Default)     #
+> #                        #
+> ##########################
+> 
+> ### Compute ERGM Results
+> #registerDoParallel(detectCores())
+> registerDoParallel(10)
+> ergm_sim_list = foreach(i = 1:nsims) %dopar% {
++   # cat("***********************************\n")
++   # cat(paste("estimating sample" ,i, "\n"))
++   # cat("***********************************\n")
++   skip_to_next <- FALSE
++   formula <- g_sim[[i]] ~ edges + nodematch("x") + kstar(2) + triangles
++   ergm_sim = 
++     tryCatch(withTimeout(
++                           ergm(formula, eval.loglik=FALSE,
++                                control=control.ergm(init = init_params[i,], MCMLE.confidence=0.95)),
++                timeout = 5*60, onTimeout = "error"),
++                error = function(e) {skip_to_next <<- NULL})
++   ergm_sim
++ }
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Iteration 1 of at most 60:
+Iteration 1 of at most 60:
+Iteration 1 of at most 60:
+Iteration 1 of at most 60:
+Iteration 1 of at most 60:
+Iteration 1 of at most 60:
+Iteration 1 of at most 60:
+Iteration 1 of at most 60:
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.8729.
+Estimating equations are not within tolerance region.
+Iteration 2 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.1781.
+Estimating equations are not within tolerance region.
+Iteration 2 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0763.
+Convergence test p-value: 0.1470. Not converged with 95% confidence; increasing sample size.
+Iteration 2 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0250.
+Convergence test p-value: 0.8102. Not converged with 95% confidence; increasing sample size.
+Iteration 3 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0658.
+Convergence test p-value: 0.4940. Not converged with 95% confidence; increasing sample size.
+Iteration 3 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0048.
+Convergence test p-value: 0.4543. Not converged with 95% confidence; increasing sample size.
+Iteration 4 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0747.
+Convergence test p-value: 0.0496. Converged with 95% confidence.
+Finished MCMLE.
+Optimizing with step length 0.0005.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+The log-likelihood improved by 1.7386.
+Estimating equations are not within tolerance region.
+Iteration 2 of at most 60:
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 0.3662.
+The log-likelihood improved by 2.5368.
+Estimating equations are not within tolerance region.
+Iteration 2 of at most 60:
+Optimizing with step length 0.0005.
+The log-likelihood improved by 1.4044.
+Estimating equations are not within tolerance region.
+Iteration 3 of at most 60:
+Optimizing with step length 0.0017.
+The log-likelihood improved by 2.3342.
+Estimating equations are not within tolerance region.
+Iteration 3 of at most 60:
+Optimizing with step length 0.0013.
+The log-likelihood improved by 2.1122.
+Estimating equations are not within tolerance region.
+Iteration 4 of at most 60:
+Model statistics ‘nodematch.x’ are not varying. This may indicate that the observed data occupies an extreme point in the sample space or that the estimation has reached a dead-end configuration.
+Warning: Model statistics ‘kstar2’ are linear combinations of some set of preceding statistics at the current stage of the estimation. This may indicate that the model is nonidentifiable.
+Optimizing with step length < 0.0001.
+The log-likelihood improved by 13824197998856763670308654678016.0000.
+Estimating equations are not within tolerance region.
+Iteration 3 of at most 60:
+Model statistics ‘nodematch.x’ and ‘triangle’ are not varying. This may indicate that the observed data occupies an extreme point in the sample space or that the estimation has reached a dead-end configuration.
+Optimizing with step length 0.0377.
+The log-likelihood improved by 46387340998772216332302680064.0000.
+Estimating equations are not within tolerance region.
+Iteration 4 of at most 60:
+Warning: Model statistics ‘nodematch.x’, ‘kstar2’, and ‘triangle’ are linear combinations of some set of preceding statistics at the current stage of the estimation. This may indicate that the model is nonidentifiable.
+Optimizing with step length 0.0002.
+The log-likelihood improved by 9.6297.
+Estimating equations are not within tolerance region.
+Estimating equations did not move closer to tolerance region more than 1 time(s) in 4 steps; increasing sample size.
+Iteration 5 of at most 60:
+Optimizing with step length 0.0026.
+The log-likelihood improved by 2.5892.
+Estimating equations are not within tolerance region.
+Iteration 4 of at most 60:
+Optimizing with step length 0.0006.
+The log-likelihood improved by 2.5149.
+Estimating equations are not within tolerance region.
+Iteration 5 of at most 60:
+Optimizing with step length 0.3421.
+The log-likelihood improved by 2.4668.
+Estimating equations are not within tolerance region.
+Iteration 6 of at most 60:
+Optimizing with step length 0.9048.
+The log-likelihood improved by 2.9555.
+Estimating equations are not within tolerance region.
+Iteration 7 of at most 60:
+Optimizing with step length 0.0022.
+The log-likelihood improved by 2.5087.
+Estimating equations are not within tolerance region.
+Iteration 5 of at most 60:
+Optimizing with step length 0.0046.
+The log-likelihood improved by 2.1026.
+Estimating equations are not within tolerance region.
+Iteration 5 of at most 60:
+Optimizing with step length 0.0006.
+The log-likelihood improved by 1.7987.
+Estimating equations are not within tolerance region.
+Iteration 2 of at most 60:
+Optimizing with step length 0.0029.
+The log-likelihood improved by 3.2730.
+Estimating equations are not within tolerance region.
+Iteration 6 of at most 60:
+Optimizing with step length 0.0031.
+The log-likelihood improved by 2.9353.
+Estimating equations are not within tolerance region.
+Iteration 7 of at most 60:
+Optimizing with step length 0.0053.
+The log-likelihood improved by 4.8815.
+Estimating equations are not within tolerance region.
+Iteration 8 of at most 60:
+Optimizing with step length 0.0058.
+The log-likelihood improved by 3.0259.
+Estimating equations are not within tolerance region.
+Iteration 9 of at most 60:
+Optimizing with step length 0.0088.
+The log-likelihood improved by 3.5797.
+Estimating equations are not within tolerance region.
+Iteration 10 of at most 60:
+Optimizing with step length 0.0167.
+The log-likelihood improved by 3.2787.
+Estimating equations are not within tolerance region.
+Iteration 11 of at most 60:
+Optimizing with step length 0.0089.
+The log-likelihood improved by 2.0785.
+Estimating equations are not within tolerance region.
+Iteration 6 of at most 60:
+Optimizing with step length 0.0414.
+The log-likelihood improved by 2.8009.
+Estimating equations are not within tolerance region.
+Iteration 12 of at most 60:
+Optimizing with step length 0.0651.
+The log-likelihood improved by 3.2481.
+Estimating equations are not within tolerance region.
+Iteration 13 of at most 60:
+Optimizing with step length 0.1055.
+The log-likelihood improved by 2.8085.
+Estimating equations are not within tolerance region.
+Iteration 14 of at most 60:
+Optimizing with step length 0.1568.
+The log-likelihood improved by 3.4868.
+Estimating equations are not within tolerance region.
+Iteration 15 of at most 60:
+Optimizing with step length 0.0089.
+The log-likelihood improved by 2.3782.
+Estimating equations are not within tolerance region.
+Iteration 7 of at most 60:
+Optimizing with step length 0.0485.
+The log-likelihood improved by 2.8244.
+Estimating equations are not within tolerance region.
+Iteration 16 of at most 60:
+Optimizing with step length 0.0784.
+The log-likelihood improved by 2.5874.
+Estimating equations are not within tolerance region.
+Iteration 17 of at most 60:
+Optimizing with step length 0.0016.
+The log-likelihood improved by 2.4291.
+Estimating equations are not within tolerance region.
+Iteration 3 of at most 60:
+Optimizing with step length 0.1090.
+The log-likelihood improved by 3.5854.
+Estimating equations are not within tolerance region.
+Iteration 18 of at most 60:
+Optimizing with step length 0.0569.
+The log-likelihood improved by 3.7906.
+Estimating equations are not within tolerance region.
+Iteration 19 of at most 60:
+Optimizing with step length 0.0052.
+The log-likelihood improved by 2.9215.
+Estimating equations are not within tolerance region.
+Iteration 8 of at most 60:
+Optimizing with step length 0.0055.
+The log-likelihood improved by 2.8826.
+Estimating equations are not within tolerance region.
+Iteration 9 of at most 60:
+Optimizing with step length 0.0071.
+The log-likelihood improved by 3.1833.
+Estimating equations are not within tolerance region.
+Iteration 10 of at most 60:
+Optimizing with step length 0.0102.
+The log-likelihood improved by 3.2172.
+Estimating equations are not within tolerance region.
+Iteration 11 of at most 60:
+Optimizing with step length 0.0151.
+The log-likelihood improved by 4.0427.
+Estimating equations are not within tolerance region.
+Iteration 12 of at most 60:
+Optimizing with step length 0.0198.
+The log-likelihood improved by 2.8672.
+Estimating equations are not within tolerance region.
+Iteration 13 of at most 60:
+Optimizing with step length 0.0280.
+The log-likelihood improved by 2.6965.
+Estimating equations are not within tolerance region.
+Iteration 14 of at most 60:
+Optimizing with step length 0.0495.
+The log-likelihood improved by 2.9676.
+Estimating equations are not within tolerance region.
+Iteration 15 of at most 60:
+Model statistics ‘nodematch.x’ and ‘triangle’ are not varying. This may indicate that the observed data occupies an extreme point in the sample space or that the estimation has reached a dead-end configuration.
+Optimizing with step length 0.0003.
+The log-likelihood improved by 10572400755584073096710406012928.0000.
+Estimating equations are not within tolerance region.
+Estimating equations did not move closer to tolerance region more than 1 time(s) in 4 steps; increasing sample size.
+Iteration 16 of at most 60:
+Optimizing with step length 0.0016.
+The log-likelihood improved by 2.1819.
+Estimating equations are not within tolerance region.
+Iteration 4 of at most 60:
+Optimizing with step length 0.0014.
+The log-likelihood improved by 2.4865.
+Estimating equations are not within tolerance region.
+Iteration 5 of at most 60:
+Optimizing with step length 0.0017.
+The log-likelihood improved by 3.0824.
+Estimating equations are not within tolerance region.
+Iteration 6 of at most 60:
+Optimizing with step length 0.0011.
+The log-likelihood improved by 3.3852.
+Estimating equations are not within tolerance region.
+Iteration 7 of at most 60:
+Optimizing with step length 0.0014.
+The log-likelihood improved by 2.5249.
+Estimating equations are not within tolerance region.
+Iteration 8 of at most 60:
+Optimizing with step length 0.0019.
+The log-likelihood improved by 3.0400.
+Estimating equations are not within tolerance region.
+Iteration 9 of at most 60:
+Optimizing with step length 0.0032.
+The log-likelihood improved by 4.0277.
+Estimating equations are not within tolerance region.
+Iteration 10 of at most 60:
+Optimizing with step length 0.0037.
+The log-likelihood improved by 2.7619.
+Estimating equations are not within tolerance region.
+Iteration 11 of at most 60:
+Optimizing with step length 0.0092.
+The log-likelihood improved by 4.2419.
+Estimating equations are not within tolerance region.
+Iteration 12 of at most 60:
+Optimizing with step length 0.0188.
+The log-likelihood improved by 2.5324.
+Estimating equations are not within tolerance region.
+Iteration 13 of at most 60:
+Optimizing with step length 0.0314.
+The log-likelihood improved by 2.8794.
+Estimating equations are not within tolerance region.
+Iteration 14 of at most 60:
+Optimizing with step length 0.0440.
+The log-likelihood improved by 2.4649.
+Estimating equations are not within tolerance region.
+Iteration 15 of at most 60:
+Optimizing with step length 0.1042.
+The log-likelihood improved by 3.6351.
+Estimating equations are not within tolerance region.
+Iteration 16 of at most 60:
+Optimizing with step length 0.0312.
+The log-likelihood improved by 3.5464.
+Estimating equations are not within tolerance region.
+Iteration 17 of at most 60:
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 0.6174.
+The log-likelihood improved by 4.7568.
+Estimating equations are not within tolerance region.
+Iteration 2 of at most 60:
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 0.7370.
+The log-likelihood improved by 8.2081.
+Estimating equations are not within tolerance region.
+Iteration 2 of at most 60:
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 0.0004.
+The log-likelihood improved by 1.7647.
+Estimating equations are not within tolerance region.
+Iteration 2 of at most 60:
+Optimizing with step length 0.3074.
+The log-likelihood improved by 6.4255.
+Estimating equations are not within tolerance region.
+Iteration 2 of at most 60:
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 0.1433.
+The log-likelihood improved by 3.0073.
+Estimating equations are not within tolerance region.
+Iteration 3 of at most 60:
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 0.2188.
+The log-likelihood improved by 3.9699.
+Estimating equations are not within tolerance region.
+Iteration 2 of at most 60:
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 0.1489.
+The log-likelihood improved by 3.3720.
+Estimating equations are not within tolerance region.
+Iteration 2 of at most 60:
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 0.4647.
+The log-likelihood improved by 6.7099.
+Estimating equations are not within tolerance region.
+Iteration 2 of at most 60:
+Optimizing with step length 0.0010.
+The log-likelihood improved by 5.4828.
+Estimating equations are not within tolerance region.
+Iteration 2 of at most 60:
+Optimizing with step length 0.0205.
+The log-likelihood improved by 3.7305.
+Estimating equations are not within tolerance region.
+Iteration 3 of at most 60:
+Optimizing with step length 0.0444.
+The log-likelihood improved by 5.7957.
+Estimating equations are not within tolerance region.
+Iteration 4 of at most 60:
+Model statistics ‘nodematch.x’ are not varying. This may indicate that the observed data occupies an extreme point in the sample space or that the estimation has reached a dead-end configuration.
+Warning: Model statistics ‘kstar2’ are linear combinations of some set of preceding statistics at the current stage of the estimation. This may indicate that the model is nonidentifiable.
+Optimizing with step length < 0.0001.
+The log-likelihood improved by 455755188074139125260520259584.0000.
+Estimating equations are not within tolerance region.
+Iteration 3 of at most 60:
+Model statistics ‘nodematch.x’ and ‘triangle’ are not varying. This may indicate that the observed data occupies an extreme point in the sample space or that the estimation has reached a dead-end configuration.
+Optimizing with step length 0.0047.
+The log-likelihood improved by 299301394988870355200655905162657041387356160.0000.
+Estimating equations are not within tolerance region.
+Iteration 4 of at most 60:
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 0.0007.
+The log-likelihood improved by 2.5443.
+Estimating equations are not within tolerance region.
+Iteration 2 of at most 60:
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 0.0355.
+The log-likelihood improved by 3.9394.
+Estimating equations are not within tolerance region.
+Iteration 3 of at most 60:
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 0.0471.
+The log-likelihood improved by 3.2629.
+Estimating equations are not within tolerance region.
+Iteration 4 of at most 60:
+Optimizing with step length 0.1045.
+The log-likelihood improved by 2.6266.
+Estimating equations are not within tolerance region.
+Iteration 2 of at most 60:
+Optimizing with step length 0.0004.
+The log-likelihood improved by 2.0583.
+Estimating equations are not within tolerance region.
+Iteration 2 of at most 60:
+Optimizing with step length 0.0397.
+The log-likelihood improved by 2.6908.
+Estimating equations are not within tolerance region.
+Iteration 3 of at most 60:
+Optimizing with step length 0.2213.
+The log-likelihood improved by 3.1690.
+Estimating equations are not within tolerance region.
+Iteration 4 of at most 60:
+Optimizing with step length 0.0012.
+The log-likelihood improved by 6.5484.
+Estimating equations are not within tolerance region.
+Iteration 2 of at most 60:
+Optimizing with step length 0.0385.
+The log-likelihood improved by 3.2527.
+Estimating equations are not within tolerance region.
+Iteration 3 of at most 60:
+Optimizing with step length 0.0560.
+The log-likelihood improved by 3.5809.
+Estimating equations are not within tolerance region.
+Iteration 4 of at most 60:
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 0.1114.
+The log-likelihood improved by 2.9462.
+Estimating equations are not within tolerance region.
+Iteration 5 of at most 60:
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 0.0358.
+The log-likelihood improved by 3.1921.
+Estimating equations are not within tolerance region.
+Iteration 2 of at most 60:
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Model statistics ‘nodematch.x’ are not varying. This may indicate that the observed data occupies an extreme point in the sample space or that the estimation has reached a dead-end configuration.
+Warning: Model statistics ‘kstar2’ are linear combinations of some set of preceding statistics at the current stage of the estimation. This may indicate that the model is nonidentifiable.
+Optimizing with step length 0.0001.
+The log-likelihood improved by 2.0829.
+Estimating equations are not within tolerance region.
+Iteration 3 of at most 60:
+Optimizing with step length 0.0145.
+The log-likelihood improved by 3.3886.
+Estimating equations are not within tolerance region.
+Iteration 4 of at most 60:
+Optimizing with step length 0.0072.
+The log-likelihood improved by 4.1204.
+Estimating equations are not within tolerance region.
+Iteration 2 of at most 60:
+Optimizing with step length 0.0300.
+The log-likelihood improved by 5.9930.
+Estimating equations are not within tolerance region.
+Iteration 2 of at most 60:
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 0.0256.
+The log-likelihood improved by 3.3691.
+Estimating equations are not within tolerance region.
+Iteration 5 of at most 60:
+Optimizing with step length 0.0465.
+The log-likelihood improved by 3.3000.
+Estimating equations are not within tolerance region.
+Iteration 6 of at most 60:
+Optimizing with step length 0.0004.
+The log-likelihood improved by 2.0936.
+Estimating equations are not within tolerance region.
+Iteration 2 of at most 60:
+Optimizing with step length 0.0172.
+The log-likelihood improved by 2.1063.
+Estimating equations are not within tolerance region.
+Iteration 3 of at most 60:
+Optimizing with step length 0.0391.
+The log-likelihood improved by 4.4499.
+Estimating equations are not within tolerance region.
+Iteration 4 of at most 60:
+Optimizing with step length 0.0015.
+The log-likelihood improved by 2.6355.
+Estimating equations are not within tolerance region.
+Iteration 2 of at most 60:
+Optimizing with step length 0.0018.
+The log-likelihood improved by 9.6740.
+Estimating equations are not within tolerance region.
+Iteration 2 of at most 60:
+Optimizing with step length 0.0215.
+The log-likelihood improved by 2.7553.
+Estimating equations are not within tolerance region.
+Iteration 3 of at most 60:
+Optimizing with step length 0.0303.
+The log-likelihood improved by 3.2561.
+Estimating equations are not within tolerance region.
+Iteration 4 of at most 60:
+Optimizing with step length 0.0164.
+The log-likelihood improved by 2.1573.
+Estimating equations are not within tolerance region.
+Iteration 3 of at most 60:
+Optimizing with step length 0.0265.
+The log-likelihood improved by 2.8129.
+Estimating equations are not within tolerance region.
+Iteration 4 of at most 60:
+Optimizing with step length 0.0351.
+The log-likelihood improved by 3.2081.
+Estimating equations are not within tolerance region.
+Iteration 5 of at most 60:
+Optimizing with step length 0.0086.
+The log-likelihood improved by 2.2096.
+Estimating equations are not within tolerance region.
+Iteration 3 of at most 60:
+Warning: Model statistics ‘nodematch.x’, ‘kstar2’, and ‘triangle’ are linear combinations of some set of preceding statistics at the current stage of the estimation. This may indicate that the model is nonidentifiable.
+Optimizing with step length 0.0002.
+The log-likelihood improved by 37.1911.
+Estimating equations are not within tolerance region.
+Iteration 6 of at most 60:
+Optimizing with step length 0.0139.
+The log-likelihood improved by 3.7216.
+Estimating equations are not within tolerance region.
+Iteration 4 of at most 60:
+Optimizing with step length 0.0026.
+The log-likelihood improved by 3.0043.
+Estimating equations are not within tolerance region.
+Iteration 5 of at most 60:
+Optimizing with step length 0.0025.
+The log-likelihood improved by 2.7505.
+Estimating equations are not within tolerance region.
+Iteration 6 of at most 60:
+Optimizing with step length 0.0043.
+The log-likelihood improved by 4.4657.
+Estimating equations are not within tolerance region.
+Iteration 7 of at most 60:
+Optimizing with step length 0.0055.
+The log-likelihood improved by 3.3218.
+Estimating equations are not within tolerance region.
+Iteration 8 of at most 60:
+Optimizing with step length 0.0055.
+The log-likelihood improved by 2.4787.
+Estimating equations are not within tolerance region.
+Iteration 9 of at most 60:
+Optimizing with step length 0.0104.
+The log-likelihood improved by 3.1542.
+Estimating equations are not within tolerance region.
+Iteration 10 of at most 60:
+Optimizing with step length 0.0156.
+The log-likelihood improved by 3.1358.
+Estimating equations are not within tolerance region.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 11 of at most 60:
+Iteration 1 of at most 60:
+Optimizing with step length 0.0039.
+The log-likelihood improved by 2.6140.
+Estimating equations are not within tolerance region.
+Iteration 2 of at most 60:
+Optimizing with step length 0.0297.
+The log-likelihood improved by 5.0569.
+Estimating equations are not within tolerance region.
+Iteration 12 of at most 60:
+Optimizing with step length 0.0004.
+The log-likelihood improved by 1.7177.
+Estimating equations are not within tolerance region.
+Iteration 13 of at most 60:
+Optimizing with step length 0.0004.
+The log-likelihood improved by 3.0269.
+Estimating equations are not within tolerance region.
+Iteration 14 of at most 60:
+Optimizing with step length 0.0011.
+The log-likelihood improved by 3.5677.
+Estimating equations are not within tolerance region.
+Iteration 15 of at most 60:
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 0.0088.
+The log-likelihood improved by 4.8992.
+Estimating equations are not within tolerance region.
+Iteration 2 of at most 60:
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 0.0137.
+The log-likelihood improved by 2.8886.
+Estimating equations are not within tolerance region.
+Iteration 2 of at most 60:
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 0.0121.
+The log-likelihood improved by 2.7562.
+Estimating equations are not within tolerance region.
+Iteration 2 of at most 60:
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 0.0071.
+The log-likelihood improved by 2.1665.
+Estimating equations are not within tolerance region.
+Iteration 2 of at most 60:
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 0.8455.
+The log-likelihood improved by 8.5454.
+Estimating equations are not within tolerance region.
+Iteration 2 of at most 60:
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 0.0034.
+The log-likelihood improved by 2.2600.
+Estimating equations are not within tolerance region.
+Iteration 2 of at most 60:
+Optimizing with step length 0.0243.
+The log-likelihood improved by 4.6531.
+Estimating equations are not within tolerance region.
+Iteration 2 of at most 60:
+Optimizing with step length 0.0048.
+The log-likelihood improved by 2.3296.
+Estimating equations are not within tolerance region.
+Iteration 3 of at most 60:
+Optimizing with step length 0.0182.
+The log-likelihood improved by 3.7618.
+Estimating equations are not within tolerance region.
+Iteration 2 of at most 60:
+Optimizing with step length 0.0018.
+The log-likelihood improved by 3.0349.
+Estimating equations are not within tolerance region.
+Iteration 3 of at most 60:
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 0.0058.
+The log-likelihood improved by 3.1115.
+Estimating equations are not within tolerance region.
+Iteration 4 of at most 60:
+Optimizing with step length 0.0021.
+The log-likelihood improved by 2.9446.
+Estimating equations are not within tolerance region.
+Iteration 4 of at most 60:
+Optimizing with step length 0.0034.
+The log-likelihood improved by 2.9936.
+Estimating equations are not within tolerance region.
+Iteration 2 of at most 60:
+Optimizing with step length 0.0055.
+The log-likelihood improved by 3.2724.
+Estimating equations are not within tolerance region.
+Iteration 3 of at most 60:
+Optimizing with step length 0.0076.
+The log-likelihood improved by 2.5455.
+Estimating equations are not within tolerance region.
+Iteration 5 of at most 60:
+Optimizing with step length 0.0079.
+The log-likelihood improved by 3.8734.
+Estimating equations are not within tolerance region.
+Iteration 4 of at most 60:
+Optimizing with step length 0.0131.
+The log-likelihood improved by 3.2905.
+Estimating equations are not within tolerance region.
+Iteration 5 of at most 60:
+Optimizing with step length < 0.0001.
+The log-likelihood improved by 3.0731.
+Estimating equations are not within tolerance region.
+Iteration 6 of at most 60:
+Model statistics ‘triangle’ are not varying. This may indicate that the observed data occupies an extreme point in the sample space or that the estimation has reached a dead-end configuration.
+Optimizing with step length 0.0002.
+The log-likelihood improved by 23882962696065568090802356224.0000.
+Estimating equations are not within tolerance region.
+Estimating equations did not move closer to tolerance region more than 1 time(s) in 4 steps; increasing sample size.
+Iteration 7 of at most 60:
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0295.
+Convergence test p-value: 0.6314. Not converged with 95% confidence; increasing sample size.
+Iteration 2 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0838.
+Convergence test p-value: 0.8024. Not converged with 95% confidence; increasing sample size.
+Iteration 3 of at most 60:
+Optimizing with step length 0.0025.
+The log-likelihood improved by 2.9645.
+Estimating equations are not within tolerance region.
+Estimating equations did not move closer to tolerance region more than 1 time(s) in 4 steps; increasing sample size.
+Iteration 4 of at most 60:
+Optimizing with step length 0.0079.
+The log-likelihood improved by 16.5737.
+Estimating equations are not within tolerance region.
+Iteration 5 of at most 60:
+Optimizing with step length 0.0018.
+The log-likelihood improved by 3.5497.
+Estimating equations are not within tolerance region.
+Iteration 6 of at most 60:
+Optimizing with step length 0.0026.
+The log-likelihood improved by 4.3938.
+Estimating equations are not within tolerance region.
+Iteration 7 of at most 60:
+Optimizing with step length 0.0052.
+The log-likelihood improved by 17.3358.
+Estimating equations are not within tolerance region.
+Iteration 8 of at most 60:
+Optimizing with step length 0.0022.
+The log-likelihood improved by 5.0402.
+Estimating equations are not within tolerance region.
+Estimating equations did not move closer to tolerance region more than 1 time(s) in 4 steps; increasing sample size.
+Iteration 9 of at most 60:
+Optimizing with step length 0.0034.
+The log-likelihood improved by 5.9457.
+Estimating equations are not within tolerance region.
+Iteration 10 of at most 60:
+Optimizing with step length 0.0059.
+The log-likelihood improved by 7.8925.
+Estimating equations are not within tolerance region.
+Iteration 11 of at most 60:
+Optimizing with step length 0.0079.
+The log-likelihood improved by 16.8696.
+Estimating equations are not within tolerance region.
+Iteration 12 of at most 60:
+Optimizing with step length 0.0027.
+The log-likelihood improved by 5.9514.
+Estimating equations are not within tolerance region.
+Iteration 13 of at most 60:
+Optimizing with step length 0.0038.
+The log-likelihood improved by 4.5991.
+Estimating equations are not within tolerance region.
+Iteration 14 of at most 60:
+Optimizing with step length 0.0082.
+The log-likelihood improved by 13.6661.
+Estimating equations are not within tolerance region.
+Iteration 15 of at most 60:
+Optimizing with step length 0.0024.
+The log-likelihood improved by 4.8108.
+Estimating equations are not within tolerance region.
+Estimating equations did not move closer to tolerance region more than 1 time(s) in 4 steps; increasing sample size.
+Iteration 16 of at most 60:
+Optimizing with step length 0.0043.
+The log-likelihood improved by 6.4535.
+Estimating equations are not within tolerance region.
+Iteration 17 of at most 60:
+Optimizing with step length 0.0030.
+The log-likelihood improved by 5.6858.
+Estimating equations are not within tolerance region.
+Iteration 18 of at most 60:
+Optimizing with step length 0.0054.
+The log-likelihood improved by 5.5477.
+Estimating equations are not within tolerance region.
+Iteration 19 of at most 60:
+Optimizing with step length 0.3140.
+The log-likelihood improved by 9.0703.
+Estimating equations are not within tolerance region.
+Iteration 20 of at most 60:
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 0.2594.
+The log-likelihood improved by 4.0868.
+Estimating equations are not within tolerance region.
+Iteration 2 of at most 60:
+Optimizing with step length 0.0013.
+The log-likelihood improved by 2.1739.
+Estimating equations are not within tolerance region.
+Iteration 3 of at most 60:
+Optimizing with step length 0.0020.
+The log-likelihood improved by 3.9599.
+Estimating equations are not within tolerance region.
+Iteration 4 of at most 60:
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 0.8431.
+The log-likelihood improved by 6.6420.
+Estimating equations are not within tolerance region.
+Iteration 2 of at most 60:
+Optimizing with step length 0.0015.
+The log-likelihood improved by 2.2534.
+Estimating equations are not within tolerance region.
+Iteration 3 of at most 60:
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 0.0022.
+The log-likelihood improved by 2.4547.
+Estimating equations are not within tolerance region.
+Iteration 4 of at most 60:
+Optimizing with step length 0.0012.
+The log-likelihood improved by 4.3026.
+Estimating equations are not within tolerance region.
+Iteration 2 of at most 60:
+Optimizing with step length 1.0000.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+The log-likelihood improved by 3.9306.
+Estimating equations are not within tolerance region.
+Iteration 21 of at most 60:
+Optimizing with step length 0.0009.
+The log-likelihood improved by 2.3765.
+Estimating equations are not within tolerance region.
+Iteration 2 of at most 60:
+Optimizing with step length 0.0015.
+The log-likelihood improved by 3.1980.
+Estimating equations are not within tolerance region.
+Iteration 3 of at most 60:
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0796.
+Convergence test p-value: 0.8298. Not converged with 95% confidence; increasing sample size.
+Iteration 2 of at most 60:
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 0.0021.
+The log-likelihood improved by 5.2095.
+Estimating equations are not within tolerance region.
+Iteration 2 of at most 60:
+Optimizing with step length 0.0022.
+The log-likelihood improved by 3.7735.
+Estimating equations are not within tolerance region.
+Iteration 2 of at most 60:
+Warning: Model statistics ‘triangle’ are linear combinations of some set of preceding statistics at the current stage of the estimation. This may indicate that the model is nonidentifiable.
+Optimizing with step length < 0.0001.
+The log-likelihood improved by 1.0882.
+Estimating equations are not within tolerance region.
+Iteration 4 of at most 60:
+Optimizing with step length 0.0011.
+The log-likelihood improved by 2.4289.
+Estimating equations are not within tolerance region.
+Iteration 3 of at most 60:
+Optimizing with step length 0.0016.
+The log-likelihood improved by 2.6932.
+Estimating equations are not within tolerance region.
+Iteration 4 of at most 60:
+Optimizing with step length 0.0001.
+The log-likelihood improved by 9.1862.
+Estimating equations are not within tolerance region.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 0.0025.
+The log-likelihood improved by 2.4063.
+Estimating equations are not within tolerance region.
+Iteration 5 of at most 60:
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 0.0008.
+The log-likelihood improved by 2.1479.
+Estimating equations are not within tolerance region.
+Iteration 6 of at most 60:
+Optimizing with step length 0.0017.
+The log-likelihood improved by 2.9359.
+Estimating equations are not within tolerance region.
+Iteration 7 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0319.
+Convergence test p-value: 0.3853. Not converged with 95% confidence; increasing sample size.
+Iteration 3 of at most 60:
+Optimizing with step length 0.0045.
+The log-likelihood improved by 5.1410.
+Estimating equations are not within tolerance region.
+Iteration 8 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0395.
+Convergence test p-value: 0.3875. Not converged with 95% confidence; increasing sample size.
+Iteration 2 of at most 60:
+Optimizing with step length 0.0024.
+The log-likelihood improved by 3.8740.
+Estimating equations are not within tolerance region.
+Iteration 2 of at most 60:
+Optimizing with step length 0.0008.
+The log-likelihood improved by 2.0911.
+Estimating equations are not within tolerance region.
+Estimating equations did not move closer to tolerance region more than 1 time(s) in 4 steps; increasing sample size.
+Iteration 9 of at most 60:
+Optimizing with step length 0.2715.
+The log-likelihood improved by 9.0794.
+Estimating equations are not within tolerance region.
+Iteration 2 of at most 60:
+Optimizing with step length 0.0013.
+The log-likelihood improved by 2.8898.
+Estimating equations are not within tolerance region.
+Iteration 3 of at most 60:
+Optimizing with step length 0.0016.
+The log-likelihood improved by 3.2952.
+Estimating equations are not within tolerance region.
+Iteration 4 of at most 60:
+Optimizing with step length 0.0027.
+The log-likelihood improved by 3.6820.
+Estimating equations are not within tolerance region.
+Iteration 5 of at most 60:
+Optimizing with step length 0.0027.
+The log-likelihood improved by 4.1134.
+Estimating equations are not within tolerance region.
+Iteration 10 of at most 60:
+Optimizing with step length 0.0020.
+The log-likelihood improved by 3.1944.
+Estimating equations are not within tolerance region.
+Iteration 3 of at most 60:
+Optimizing with step length 0.0025.
+The log-likelihood improved by 2.9392.
+Estimating equations are not within tolerance region.
+Iteration 4 of at most 60:
+Optimizing with step length 0.0014.
+The log-likelihood improved by 3.6248.
+Estimating equations are not within tolerance region.
+Iteration 6 of at most 60:
+Optimizing with step length 0.0017.
+The log-likelihood improved by 3.5359.
+Estimating equations are not within tolerance region.
+Estimating equations did not move closer to tolerance region more than 1 time(s) in 4 steps; increasing sample size.
+Iteration 7 of at most 60:
+Optimizing with step length 0.0025.
+The log-likelihood improved by 3.2452.
+Estimating equations are not within tolerance region.
+Iteration 8 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0477.
+Convergence test p-value: 0.1245. Not converged with 95% confidence; increasing sample size.
+Iteration 3 of at most 60:
+Optimizing with step length 0.0009.
+The log-likelihood improved by 2.5519.
+Estimating equations are not within tolerance region.
+Iteration 11 of at most 60:
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 0.0019.
+The log-likelihood improved by 2.7859.
+Estimating equations are not within tolerance region.
+Iteration 12 of at most 60:
+Optimizing with step length 0.0037.
+The log-likelihood improved by 4.3759.
+Estimating equations are not within tolerance region.
+Iteration 13 of at most 60:
+Optimizing with step length 0.0015.
+The log-likelihood improved by 3.3865.
+Estimating equations are not within tolerance region.
+Iteration 9 of at most 60:
+Optimizing with step length 0.0023.
+The log-likelihood improved by 3.3421.
+Estimating equations are not within tolerance region.
+Iteration 10 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0375.
+Convergence test p-value: 0.0311. Converged with 95% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 0.0008.
+The log-likelihood improved by 2.1409.
+Estimating equations are not within tolerance region.
+Iteration 14 of at most 60:
+Optimizing with step length 0.0031.
+The log-likelihood improved by 3.0458.
+Estimating equations are not within tolerance region.
+Iteration 11 of at most 60:
+Optimizing with step length 0.0023.
+The log-likelihood improved by 4.5386.
+Estimating equations are not within tolerance region.
+Iteration 15 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0904.
+Convergence test p-value: 0.5401. Not converged with 95% confidence; increasing sample size.
+Iteration 2 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.1783.
+Estimating equations are not within tolerance region.
+Iteration 2 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0186.
+Convergence test p-value: 0.0751. Not converged with 95% confidence; increasing sample size.
+Iteration 4 of at most 60:
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 0.0067.
+The log-likelihood improved by 7.4923.
+Estimating equations are not within tolerance region.
+Iteration 12 of at most 60:
+Optimizing with step length 0.0018.
+The log-likelihood improved by 3.2781.
+Estimating equations are not within tolerance region.
+Estimating equations did not move closer to tolerance region more than 1 time(s) in 4 steps; increasing sample size.
+Iteration 13 of at most 60:
+Optimizing with step length 0.0009.
+The log-likelihood improved by 2.3437.
+Estimating equations are not within tolerance region.
+Iteration 2 of at most 60:
+Optimizing with step length 0.0011.
+The log-likelihood improved by 2.4965.
+Estimating equations are not within tolerance region.
+Iteration 3 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.3865.
+Estimating equations are not within tolerance region.
+Iteration 3 of at most 60:
+Optimizing with step length 0.0026.
+The log-likelihood improved by 3.7484.
+Estimating equations are not within tolerance region.
+Iteration 14 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0406.
+Convergence test p-value: 0.4281. Not converged with 95% confidence; increasing sample size.
+Iteration 3 of at most 60:
+Model statistics ‘nodematch.x’ and ‘triangle’ are not varying. This may indicate that the observed data occupies an extreme point in the sample space or that the estimation has reached a dead-end configuration.
+Warning: Model statistics ‘nodematch.x’ are linear combinations of some set of preceding statistics at the current stage of the estimation. This may indicate that the model is nonidentifiable.
+Optimizing with step length 0.0008.
+The log-likelihood improved by 49.2975.
+Estimating equations are not within tolerance region.
+Iteration 15 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0784.
+Convergence test p-value: 0.9296. Not converged with 95% confidence; increasing sample size.
+Iteration 4 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0128.
+Convergence test p-value: 0.1991. Not converged with 95% confidence; increasing sample size.
+Iteration 5 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0216.
+Convergence test p-value: 0.2453. Not converged with 95% confidence; increasing sample size.
+Iteration 4 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0361.
+Convergence test p-value: 0.1578. Not converged with 95% confidence; increasing sample size.
+Iteration 5 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0257.
+Convergence test p-value: 0.0597. Not converged with 95% confidence; increasing sample size.
+Iteration 6 of at most 60:
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0093.
+Convergence test p-value: 0.3778. Not converged with 95% confidence; increasing sample size.
+Iteration 6 of at most 60:
+Optimizing with step length 0.0074.
+The log-likelihood improved by 4.2039.
+Estimating equations are not within tolerance region.
+Iteration 16 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0922.
+Convergence test p-value: 0.9056. Not converged with 95% confidence; increasing sample size.
+Iteration 2 of at most 60:
+Optimizing with step length < 0.0001.
+The log-likelihood improved by 0.0164.
+Estimating equations are not within tolerance region.
+Iteration 3 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0049.
+Optimizing with step length 1.0000.
+Convergence test p-value: 0.0439. Converged with 95% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+The log-likelihood improved by 0.0070.
+Convergence test p-value: 0.0130. Converged with 95% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 0.0109.
+The log-likelihood improved by 2.1836.
+Estimating equations are not within tolerance region.
+Iteration 17 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0778.
+Convergence test p-value: 0.9072. Not converged with 95% confidence; increasing sample size.
+Iteration 2 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0606.
+Convergence test p-value: 0.7145. Not converged with 95% confidence; increasing sample size.
+Iteration 2 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0058.
+Convergence test p-value: 0.2654. Not converged with 95% confidence; increasing sample size.
+Iteration 3 of at most 60:
+Optimizing with step length 0.0129.
+The log-likelihood improved by 3.0623.
+Estimating equations are not within tolerance region.
+Iteration 18 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0062.
+Convergence test p-value: 0.0496. Converged with 95% confidence.
+Finished MCMLE.
+Optimizing with step length 0.0021.
+The log-likelihood improved by 5.0122.
+Estimating equations are not within tolerance region.
+Iteration 19 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.1546.
+Estimating equations are not within tolerance region.
+Iteration 3 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.1572.
+Estimating equations are not within tolerance region.
+Iteration 3 of at most 60:
+Optimizing with step length 0.0039.
+The log-likelihood improved by 3.9303.
+Estimating equations are not within tolerance region.
+Iteration 20 of at most 60:
+Optimizing with step length 0.0041.
+The log-likelihood improved by 2.4736.
+Estimating equations are not within tolerance region.
+Iteration 21 of at most 60:
+Optimizing with step length 0.0063.
+The log-likelihood improved by 2.7513.
+Estimating equations are not within tolerance region.
+Iteration 22 of at most 60:
+Warning: Model statistics ‘triangle’ are linear combinations of some set of preceding statistics at the current stage of the estimation. This may indicate that the model is nonidentifiable.
+Optimizing with step length 0.0005.
+The log-likelihood improved by 4.4958.
+Estimating equations are not within tolerance region.
+Iteration 4 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0546.
+Convergence test p-value: 0.6852. Not converged with 95% confidence; increasing sample size.
+Iteration 4 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0094.
+Convergence test p-value: 0.2012. Not converged with 95% confidence; increasing sample size.
+Iteration 4 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0449.
+Convergence test p-value: 0.1615. Not converged with 95% confidence; increasing sample size.
+Iteration 4 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0156.
+Convergence test p-value: 0.2957. Not converged with 95% confidence; increasing sample size.
+Iteration 5 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0038.
+Convergence test p-value: 0.1912. Not converged with 95% confidence; increasing sample size.
+Iteration 5 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0133.
+Convergence test p-value: 0.0367. Converged with 95% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.1158.
+Estimating equations are not within tolerance region.
+Iteration 2 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0521.
+Convergence test p-value: 0.8171. Not converged with 95% confidence; increasing sample size.
+Iteration 3 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0045.
+Convergence test p-value: 0.0500. Converged with 95% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.3619.
+Estimating equations are not within tolerance region.
+Iteration 4 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0394.
+Convergence test p-value: 0.6205. Not converged with 95% confidence; increasing sample size.
+Iteration 2 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.4148.
+Estimating equations are not within tolerance region.
+Estimating equations did not move closer to tolerance region more than 1 time(s) in 4 steps; increasing sample size.
+Iteration 5 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0760.
+Convergence test p-value: 0.5759. Not converged with 95% confidence; increasing sample size.
+Iteration 3 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0564.
+Convergence test p-value: 0.1121. Not converged with 95% confidence; increasing sample size.
+Iteration 6 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0049.
+Convergence test p-value: 0.0813. Not converged with 95% confidence; increasing sample size.
+Iteration 4 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0367.
+Convergence test p-value: 0.0002. Converged with 95% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.1527.
+Estimating equations are not within tolerance region.
+Iteration 2 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.1067.
+Estimating equations are not within tolerance region.
+Iteration 3 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0182.
+Convergence test p-value: 0.0164. Converged with 95% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0855.
+Convergence test p-value: 0.6190. Not converged with 95% confidence; increasing sample size.
+Iteration 4 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0382.
+Convergence test p-value: 0.8099. Not converged with 95% confidence; increasing sample size.
+Iteration 2 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0084.
+Convergence test p-value: 0.0241. Converged with 95% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0330.
+Convergence test p-value: 0.5297. Not converged with 95% confidence; increasing sample size.
+Iteration 2 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.1037.
+Estimating equations are not within tolerance region.
+Iteration 3 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0324.
+Convergence test p-value: 0.3807. Not converged with 95% confidence; increasing sample size.
+Iteration 5 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.2305.
+Estimating equations are not within tolerance region.
+Estimating equations did not move closer to tolerance region more than 1 time(s) in 4 steps; increasing sample size.
+Iteration 4 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0179.
+Convergence test p-value: 0.1195. Not converged with 95% confidence; increasing sample size.
+Iteration 3 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0417.
+Convergence test p-value: 0.0470. Converged with 95% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.1702.
+Estimating equations are not within tolerance region.
+Iteration 5 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0116.
+Convergence test p-value: 0.1526. Not converged with 95% confidence; increasing sample size.
+Iteration 4 of at most 60:
+Optimizing with step length 0.0265.
+The log-likelihood improved by 3.0965.
+Estimating equations are not within tolerance region.
+Iteration 2 of at most 60:
+Optimizing with step length 0.2695.
+The log-likelihood improved by 3.9104.
+Estimating equations are not within tolerance region.
+Iteration 3 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0080.
+Convergence test p-value: 0.0708. Not converged with 95% confidence; increasing sample size.
+Iteration 6 of at most 60:
+Optimizing with step length 0.7850.
+The log-likelihood improved by 2.6447.
+Estimating equations are not within tolerance region.
+Iteration 4 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0128.
+Convergence test p-value: 0.0613. Not converged with 95% confidence; increasing sample size.
+Iteration 5 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.4432.
+Estimating equations are not within tolerance region.
+Iteration 5 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0013.
+Convergence test p-value: 0.0571. Not converged with 95% confidence; increasing sample size.
+Iteration 7 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0287.
+Convergence test p-value: 0.0444. Converged with 95% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.1338.
+Estimating equations are not within tolerance region.
+Iteration 2 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0055.
+Convergence test p-value: 0.0383. Converged with 95% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 0.0312.
+The log-likelihood improved by 3.0047.
+Estimating equations are not within tolerance region.
+Iteration 6 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0087.
+Convergence test p-value: 0.4331. Not converged with 95% confidence; increasing sample size.
+Iteration 3 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.2512.
+Estimating equations are not within tolerance region.
+Iteration 2 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.4525.
+Estimating equations are not within tolerance region.
+Iteration 3 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0351.
+Convergence test p-value: 0.4866. Not converged with 95% confidence; increasing sample size.
+Iteration 4 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0733.
+Convergence test p-value: 0.4283. Not converged with 95% confidence; increasing sample size.
+Iteration 4 of at most 60:
+Optimizing with step length 0.9786.
+The log-likelihood improved by 2.6143.
+Estimating equations are not within tolerance region.
+Iteration 7 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.5784.
+Estimating equations are not within tolerance region.
+Iteration 8 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0391.
+Convergence test p-value: 0.0861. Not converged with 95% confidence; increasing sample size.
+Iteration 5 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0245.
+Convergence test p-value: 0.8686. Not converged with 95% confidence; increasing sample size.
+Iteration 9 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0201.
+Convergence test p-value: 0.1476. Not converged with 95% confidence; increasing sample size.
+Iteration 5 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0342.
+Convergence test p-value: 0.3576. Not converged with 95% confidence; increasing sample size.
+Iteration 10 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0029.
+Convergence test p-value: 0.0896. Not converged with 95% confidence; increasing sample size.
+Iteration 11 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0063.
+Convergence test p-value: 0.0527. Not converged with 95% confidence; increasing sample size.
+Iteration 6 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0266.
+Convergence test p-value: 0.1183. Not converged with 95% confidence; increasing sample size.
+Iteration 7 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0212.
+Convergence test p-value: 0.0111. Converged with 95% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0267.
+Convergence test p-value: 0.3434. Not converged with 95% confidence; increasing sample size.
+Iteration 2 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0186.
+Convergence test p-value: 0.0307. Converged with 95% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.2698.
+Estimating equations are not within tolerance region.
+Iteration 2 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0556.
+Convergence test p-value: 0.7798. Not converged with 95% confidence; increasing sample size.
+Iteration 3 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0094.
+Convergence test p-value: 0.2250. Not converged with 95% confidence; increasing sample size.
+Iteration 3 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.2006.
+Estimating equations are not within tolerance region.
+Iteration 4 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0510.
+Convergence test p-value: < 0.0001. Converged with 95% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0245.
+Convergence test p-value: 0.3603. Not converged with 95% confidence; increasing sample size.
+Iteration 5 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0077.
+Convergence test p-value: 0.1811. Not converged with 95% confidence; increasing sample size.
+Iteration 4 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0136.
+Convergence test p-value: 0.0844. Not converged with 95% confidence; increasing sample size.
+Iteration 6 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0108.
+Convergence test p-value: 0.0024. Converged with 95% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0190.
+Convergence test p-value: 0.0157. Converged with 95% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.1252.
+Estimating equations are not within tolerance region.
+Iteration 2 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.2430.
+Estimating equations are not within tolerance region.
+Iteration 2 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.1205.
+Estimating equations are not within tolerance region.
+Iteration 2 of at most 60:
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 0.0011.
+The log-likelihood improved by 3.4075.
+Estimating equations are not within tolerance region.
+Iteration 3 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.1236.
+Estimating equations are not within tolerance region.
+Iteration 3 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.1294.
+Estimating equations are not within tolerance region.
+Iteration 2 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0257.
+Convergence test p-value: 0.8292. Not converged with 95% confidence; increasing sample size.
+Iteration 2 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.1455.
+Estimating equations are not within tolerance region.
+Iteration 3 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0430.
+Convergence test p-value: 0.8483. Not converged with 95% confidence; increasing sample size.
+Iteration 4 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0399.
+Convergence test p-value: 0.6765. Not converged with 95% confidence; increasing sample size.
+Iteration 3 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.1025.
+Estimating equations are not within tolerance region.
+Iteration 4 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0467.
+Convergence test p-value: 0.5789. Not converged with 95% confidence; increasing sample size.
+Iteration 5 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0160.
+Convergence test p-value: 0.7958. Not converged with 95% confidence; increasing sample size.
+Iteration 5 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0500.
+Convergence test p-value: 0.1553. Not converged with 95% confidence; increasing sample size.
+Iteration 3 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0417.
+Convergence test p-value: 0.6136. Not converged with 95% confidence; increasing sample size.
+Iteration 6 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0159.
+Convergence test p-value: 0.2229. Not converged with 95% confidence; increasing sample size.
+Iteration 4 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0554.
+Convergence test p-value: 0.2624. Not converged with 95% confidence; increasing sample size.
+Iteration 4 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0522.
+Convergence test p-value: 0.0342. Converged with 95% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0141.
+Convergence test p-value: 0.6478. Not converged with 95% confidence; increasing sample size.
+Iteration 2 of at most 60:
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0193.
+Convergence test p-value: 0.2140. Not converged with 95% confidence; increasing sample size.
+Iteration 7 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0536.
+Convergence test p-value: 0.8519. Not converged with 95% confidence; increasing sample size.
+Iteration 2 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0433.
+Convergence test p-value: 0.1302. Not converged with 95% confidence; increasing sample size.
+Iteration 5 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0076.
+Convergence test p-value: 0.2598. Not converged with 95% confidence; increasing sample size.
+Iteration 3 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0017.
+Convergence test p-value: 0.0668. Not converged with 95% confidence; increasing sample size.
+Iteration 5 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0298.
+Convergence test p-value: 0.1686. Not converged with 95% confidence; increasing sample size.
+Iteration 6 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0131.
+Convergence test p-value: 0.2312. Not converged with 95% confidence; increasing sample size.
+Iteration 4 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0620.
+Convergence test p-value: 0.1914. Not converged with 95% confidence; increasing sample size.
+Iteration 3 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0043.
+Convergence test p-value: 0.0117. Converged with 95% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0295.
+Convergence test p-value: 0.6499. Not converged with 95% confidence; increasing sample size.
+Iteration 2 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0016.
+Convergence test p-value: 0.0282. Converged with 95% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0145.
+Convergence test p-value: 0.0384. Converged with 95% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0158.
+Convergence test p-value: 0.0019. Converged with 95% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0342.
+Convergence test p-value: 0.8830. Not converged with 95% confidence; increasing sample size.
+Iteration 2 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0358.
+Convergence test p-value: 0.8423. Not converged with 95% confidence; increasing sample size.
+Iteration 2 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0113.
+Convergence test p-value: 0.2600. Not converged with 95% confidence; increasing sample size.
+Iteration 3 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0305.
+Convergence test p-value: 0.7076. Not converged with 95% confidence; increasing sample size.
+Iteration 2 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0309.
+Convergence test p-value: 0.5329. Not converged with 95% confidence; increasing sample size.
+Iteration 3 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0291.
+Convergence test p-value: 0.2140. Not converged with 95% confidence; increasing sample size.
+Iteration 3 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0090.
+Convergence test p-value: 0.5405. Not converged with 95% confidence; increasing sample size.
+Iteration 3 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0116.
+Convergence test p-value: 0.1870. Not converged with 95% confidence; increasing sample size.
+Iteration 4 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0834.
+Convergence test p-value: 0.0003. Converged with 95% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0148.
+Convergence test p-value: 0.1486. Not converged with 95% confidence; increasing sample size.
+Iteration 4 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0692.
+Convergence test p-value: 0.7221. Not converged with 95% confidence; increasing sample size.
+Iteration 2 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0289.
+Convergence test p-value: 0.0541. Not converged with 95% confidence; increasing sample size.
+Iteration 4 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0040.
+Convergence test p-value: 0.0263. Converged with 95% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0372.
+Convergence test p-value: 0.7591. Not converged with 95% confidence; increasing sample size.
+Iteration 2 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.1027.
+Estimating equations are not within tolerance region.
+Iteration 3 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0440.
+Convergence test p-value: 0.0026. Converged with 95% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0338.
+Convergence test p-value: 0.1687. Not converged with 95% confidence; increasing sample size.
+Iteration 5 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0768.
+Convergence test p-value: 0.8463. Not converged with 95% confidence; increasing sample size.
+Iteration 2 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0205.
+Convergence test p-value: 0.0170. Converged with 95% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0272.
+Convergence test p-value: 0.7658. Not converged with 95% confidence; increasing sample size.
+Iteration 2 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0465.
+Convergence test p-value: 0.5188. Not converged with 95% confidence; increasing sample size.
+Iteration 3 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0588.
+Convergence test p-value: 0.2632. Not converged with 95% confidence; increasing sample size.
+Iteration 3 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0319.
+Convergence test p-value: 0.1000. Not converged with 95% confidence; increasing sample size.
+Iteration 4 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0316.
+Convergence test p-value: 0.5457. Not converged with 95% confidence; increasing sample size.
+Iteration 3 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0208.
+Convergence test p-value: 0.0483. Converged with 95% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0068.
+Convergence test p-value: 0.0651. Not converged with 95% confidence; increasing sample size.
+Iteration 4 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.4632.
+Estimating equations are not within tolerance region.
+Iteration 2 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0064.
+Optimizing with step length 1.0000.
+Convergence test p-value: 0.0026. Converged with 95% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+The log-likelihood improved by 0.0380.
+Convergence test p-value: 0.0635. Not converged with 95% confidence; increasing sample size.
+Iteration 4 of at most 60:
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.3131.
+Estimating equations are not within tolerance region.
+Iteration 3 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.3257.
+Estimating equations are not within tolerance region.
+Iteration 2 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.1592.
+Estimating equations are not within tolerance region.
+Iteration 4 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.5042.
+Estimating equations are not within tolerance region.
+Iteration 3 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.2419.
+Estimating equations are not within tolerance region.
+Estimating equations did not move closer to tolerance region more than 1 time(s) in 4 steps; increasing sample size.
+Iteration 5 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0266.
+Convergence test p-value: 0.7795. Not converged with 95% confidence; increasing sample size.
+Iteration 4 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0456.
+Convergence test p-value: 0.4919. Not converged with 95% confidence; increasing sample size.
+Iteration 6 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0511.
+Convergence test p-value: 0.3739. Not converged with 95% confidence; increasing sample size.
+Iteration 5 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0139.
+Convergence test p-value: 0.0007. Converged with 95% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0235.
+Convergence test p-value: 0.0898. Not converged with 95% confidence; increasing sample size.
+Iteration 7 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.4280.
+Estimating equations are not within tolerance region.
+Iteration 2 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0165.
+Convergence test p-value: 0.0006. Converged with 95% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0066.
+Convergence test p-value: < 0.0001. Converged with 95% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Optimizing with step length 1.0000.
+Iteration 1 of at most 60:
+The log-likelihood improved by 0.0138.
+Convergence test p-value: 0.5946. Not converged with 95% confidence; increasing sample size.
+Iteration 2 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.6806.
+Estimating equations are not within tolerance region.
+Iteration 3 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0254.
+Convergence test p-value: 0.8072. Not converged with 95% confidence; increasing sample size.
+Iteration 2 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.1254.
+Estimating equations are not within tolerance region.
+Iteration 4 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.2099.
+Estimating equations are not within tolerance region.
+Iteration 5 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0504.
+Convergence test p-value: 0.5450. Not converged with 95% confidence; increasing sample size.
+Iteration 3 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.3296.
+Estimating equations are not within tolerance region.
+Estimating equations did not move closer to tolerance region more than 1 time(s) in 4 steps; increasing sample size.
+Iteration 6 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0256.
+Convergence test p-value: 0.0170. Converged with 95% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0821.
+Convergence test p-value: 0.2591. Not converged with 95% confidence; increasing sample size.
+Iteration 3 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0050.
+Convergence test p-value: 0.0001. Converged with 95% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0089.
+Convergence test p-value: 0.6151. Not converged with 95% confidence; increasing sample size.
+Iteration 2 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0371.
+Convergence test p-value: 0.6103. Not converged with 95% confidence; increasing sample size.
+Iteration 7 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0046.
+Convergence test p-value: 0.1186. Not converged with 95% confidence; increasing sample size.
+Iteration 4 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.1311.
+Estimating equations are not within tolerance region.
+Iteration 2 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0640.
+Convergence test p-value: 0.6329. Not converged with 95% confidence; increasing sample size.
+Iteration 3 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.3623.
+Estimating equations are not within tolerance region.
+Iteration 3 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.6668.
+Estimating equations are not within tolerance region.
+Estimating equations did not move closer to tolerance region more than 1 time(s) in 4 steps; increasing sample size.
+Iteration 4 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0247.
+Convergence test p-value: 0.0087. Converged with 95% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.1453.
+Estimating equations are not within tolerance region.
+Estimating equations did not move closer to tolerance region more than 1 time(s) in 4 steps; increasing sample size.
+Iteration 4 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0091.
+Convergence test p-value: 0.0302. Converged with 95% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0609.
+Convergence test p-value: 0.3375. Not converged with 95% confidence; increasing sample size.
+Iteration 5 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.3744.
+Estimating equations are not within tolerance region.
+Iteration 2 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0869.
+Convergence test p-value: 0.8188. Not converged with 95% confidence; increasing sample size.
+Iteration 2 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.1021.
+Estimating equations are not within tolerance region.
+Iteration 3 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0087.
+Convergence test p-value: 0.3260. Not converged with 95% confidence; increasing sample size.
+Iteration 3 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0186.
+Convergence test p-value: 0.0717. Not converged with 95% confidence; increasing sample size.
+Iteration 6 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.1965.
+Estimating equations are not within tolerance region.
+Iteration 4 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0545.
+Convergence test p-value: 0.6334. Not converged with 95% confidence; increasing sample size.
+Iteration 5 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0665.
+Convergence test p-value: 0.0093. Converged with 95% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0600.
+Convergence test p-value: 0.8344. Not converged with 95% confidence; increasing sample size.
+Iteration 2 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0591.
+Convergence test p-value: 0.0283. Converged with 95% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0138.
+Convergence test p-value: 0.0793. Not converged with 95% confidence; increasing sample size.
+Iteration 7 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0665.
+Convergence test p-value: 0.1972. Not converged with 95% confidence; increasing sample size.
+Iteration 3 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0192.
+Convergence test p-value: 0.0017. Converged with 95% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0533.
+Convergence test p-value: 0.1528. Not converged with 95% confidence; increasing sample size.
+Iteration 4 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0404.
+Convergence test p-value: 0.0015. Converged with 95% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0045.
+Convergence test p-value: 0.0638. Not converged with 95% confidence; increasing sample size.
+Iteration 8 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0233.
+Convergence test p-value: 0.0419. Converged with 95% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0071.
+Convergence test p-value: 0.0032. Converged with 95% confidence.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0506.
+Convergence test p-value: 0.9285. Not converged with 95% confidence; increasing sample size.
+Iteration 2 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0832.
+Convergence test p-value: 0.1451. Not converged with 95% confidence; increasing sample size.
+Iteration 3 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0195.
+Convergence test p-value: 0.4026. Not converged with 95% confidence; increasing sample size.
+Iteration 4 of at most 60:
+Optimizing with step length 0.0010.
+The log-likelihood improved by 4.4404.
+Estimating equations are not within tolerance region.
+Estimating equations did not move closer to tolerance region more than 1 time(s) in 4 steps; increasing sample size.
+Iteration 5 of at most 60:
+Optimizing with step length 0.0017.
+The log-likelihood improved by 5.9465.
+Estimating equations are not within tolerance region.
+Iteration 6 of at most 60:
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.3143.
+Estimating equations are not within tolerance region.
+Iteration 2 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.8019.
+Estimating equations are not within tolerance region.
+Iteration 3 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.1624.
+Estimating equations are not within tolerance region.
+Iteration 4 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0305.
+Convergence test p-value: 0.7820. Not converged with 95% confidence; increasing sample size.
+Iteration 5 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0383.
+Convergence test p-value: 0.4748. Not converged with 95% confidence; increasing sample size.
+Iteration 6 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0632.
+Convergence test p-value: 0.1324. Not converged with 95% confidence; increasing sample size.
+Iteration 7 of at most 60:

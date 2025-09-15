@@ -1,0 +1,33 @@
+#! /bin/csh -f
+#
+#/bin/cp -f model10_sim1.tapered.R model10_sim1.tapered.R.tmp
+#/usr/local/bin/R --quiet --no-save CMD BATCH model10_sim1.tapered.R
+#/bin/cp -f mfergm_params10_n1000.RData mfergm_params10_n1000_1.RData
+#/bin/cat model10_sim1.tapered.R.tmp | sed -e 's/XXXX/my.seed=2/' > model10_sim1.tapered.R
+#/usr/local/bin/R --quiet --no-save CMD BATCH model10_sim1.tapered.R
+#/bin/cp -f mfergm_params10_n1000.RData mfergm_params10_n1000_2.RData
+#/bin/cat model10_sim1.tapered.R.tmp | sed -e 's/XXXX/my.seed=3/' > model10_sim1.tapered.R
+#/usr/local/bin/R --quiet --no-save CMD BATCH model10_sim1.tapered.R
+#/bin/cp -f mfergm_params10_n1000.RData mfergm_params10_n1000_3.RData
+#/bin/cat model10_sim1.tapered.R.tmp | sed -e 's/XXXX/my.seed=4/' > model10_sim1.tapered.R
+#/usr/local/bin/R --quiet --no-save CMD BATCH model10_sim1.tapered.R
+#/bin/cp -f mfergm_params10_n1000.RData mfergm_params10_n1000_4.RData
+#/bin/cat model10_sim1.tapered.R.tmp | sed -e 's/XXXX/my.seed=5/' > model10_sim1.tapered.R
+#/usr/local/bin/R --quiet --no-save CMD BATCH model10_sim1.tapered.R
+#/bin/cp -f mfergm_params10_n1000.RData mfergm_params10_n1000_5.RData
+#/bin/cat model10_sim1.tapered.R.tmp | sed -e 's/XXXX/my.seed=6/' > model10_sim1.tapered.R
+#/usr/local/bin/R --quiet --no-save CMD BATCH model10_sim1.tapered.R
+#/bin/cp -f mfergm_params10_n1000.RData mfergm_params10_n1000_6.RData
+#/bin/cat model10_sim1.tapered.R.tmp | sed -e 's/XXXX/my.seed=7/' > model10_sim1.tapered.R
+#/usr/local/bin/R --quiet --no-save CMD BATCH model10_sim1.tapered.R
+#/bin/cp -f mfergm_params10_n1000.RData mfergm_params10_n1000_7.RData
+/bin/cat model10_sim1.tapered.R.tmp | sed -e 's/XXXX/my.seed=8/' > model10_sim1.tapered.R
+/usr/local/bin/R --quiet --no-save CMD BATCH model10_sim1.tapered.R
+/bin/cp -f mfergm_params10_n1000.RData mfergm_params10_n1000_8.RData
+/bin/cat model10_sim1.tapered.R.tmp | sed -e 's/XXXX/my.seed=9/' > model10_sim1.tapered.R
+/usr/local/bin/R --quiet --no-save CMD BATCH model10_sim1.tapered.R
+/bin/cp -f mfergm_params10_n1000.RData mfergm_params10_n1000_9.RData
+/bin/cat model10_sim1.tapered.R.tmp | sed -e 's/XXXX/my.seed=10/' > model10_sim1.tapered.R
+/usr/local/bin/R --quiet --no-save CMD BATCH model10_sim1.tapered.R
+/bin/cp -f mfergm_params10_n1000.RData mfergm_params10_n1000_10.RData
+/usr/local/bin/R --quiet --no-save CMD BATCH summary.R

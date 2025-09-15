@@ -1,0 +1,481 @@
+> rm(list=ls())
+> my.seed=1
+> set.seed(my.seed)
+> 
+> library(ergm.tapered)
+Loading required package: ergm
+Loading required package: network
+
+‘network’ 1.18.0 (2022-10-05), part of the Statnet Project
+* ‘news(package="network")’ for changes since last version
+* ‘citation("network")’ for citation information
+* ‘https://statnet.org’ for help, support, and other information
+
+
+‘ergm’ 4.3-6983 (2022-08-20), part of the Statnet Project
+* ‘news(package="ergm")’ for changes since last version
+* ‘citation("ergm")’ for citation information
+* ‘https://statnet.org’ for help, support, and other information
+
+‘ergm’ 4 is a major update that introduces some backwards-incompatible
+changes. Please type ‘news(package="ergm")’ for a list of major
+changes.
+
+> library(doRNG)
+Loading required package: foreach
+Loading required package: rngtools
+> library(mfergm)
+> library(optimx)      # mfergm likelihood
+> library(R.utils)     # set time on ergm
+Loading required package: R.oo
+Loading required package: R.methodsS3
+R.methodsS3 v1.8.2 (2022-06-13 22:00:14 UTC) successfully loaded. See ?R.methodsS3 for help.
+R.oo v1.25.0 (2022-06-12 02:20:02 UTC) successfully loaded. See ?R.oo for help.
+
+Attaching package: ‘R.oo’
+
+The following object is masked from ‘package:R.methodsS3’:
+
+    throw
+
+The following objects are masked from ‘package:methods’:
+
+    getClasses, getMethods
+
+The following objects are masked from ‘package:base’:
+
+    attach, detach, load, save
+
+R.utils v2.12.1 (2022-10-30 22:12:37 UTC) successfully loaded. See ?R.utils for help.
+
+Attaching package: ‘R.utils’
+
+The following object is masked from ‘package:utils’:
+
+    timestamp
+
+The following objects are masked from ‘package:base’:
+
+    cat, commandArgs, getOption, isOpen, nullfile, parse, warnings
+
+> library(doParallel)  # parallel loops using 'foreach'
+Loading required package: iterators
+Loading required package: parallel
+> 
+> #####################################################################
+> #                                                                   #
+> #     Create High Transitivity ERGM Params (using ERGM fitting)     #
+> #                                                                   #
+> #####################################################################
+> 
+> nsims       =  1000                              # number of networks simulated
+> n           =  100                               # number of nodes
+> theta       =  c(-2,1,1,1) * c(2,2,1/n,1/n)      # true parameters for model 1
+> theta <- c(-1.842, 1.347, -0.154, 0.853) #perfect
+> theta <- c(-2.162, 1.457, -0.1314, 0.736)
+> theta <- c(-2.0967979, 1.4274966, -0.1387846, 0.7541693)
+> theta <- c(-2.1088249, 1.4353562, -0.1380418, 0.7504813)
+> theta <- c(-2.0766314, 1.4381472, -0.1398167, 0.7496554)
+> theta <- c(-1.9746393, 1.4805697, -0.1417278, 0.7249104)
+> theta <- c(-2.0028533, 1.5853063, -0.1655770, 0.7367452)
+> theta <- c(-1.8239798, 1.4320427, -0.1626898, 0.7308445)
+> theta <- c(-1.8793576, 1.4214192, -0.1594352, 0.7495866)
+> mv_1 <- c(394, 342, 3000, 180)
+> mv_1 <- c(358.16, 351.24, 1.0*2643.56, 1.0*123.69)
+> mv_1 <- c(400.31, 349.88, 3254.42, 1.4*126.28)
+> mv_1 <- c(393.0512, 341.0188, 3092.0576, 117.4754)
+> mv_1 <- c(0.97*393.0512, 341.0188, 3092.0576, 1.5*117.4754)
+> ##################
+> #                #
+> #     Set-up     #
+> #                #
+> ##################
+> 
+> sim <- initialize.network(theta, n, directed = FALSE)
+> x <- rbinom(n, 1, 0.5) # attributes
+> set.vertex.attribute(sim, # the name of the network object
++                      "x", # the name we want to reference the variable by in that object
++                      x # the value we are giving that variable
++ ) 
+> 
+> # load(file="sim2.RData")
+> formula <- sim ~ edges + nodematch("x") + kstar(2) + triangles
+> names(mv_1) <- names(summary(formula))
+> names(theta) <- names(mv_1)
+> 
+> 
+> 
+> ####### 1. This step several, several times for sim
+> if(T){
++ fit <- ergm.tapered(formula, eval.loglik=FALSE, target.stats=mv_1,
++                     control=control.ergm.tapered(parallel=4,init=theta, MCMLE.MCMC.precision=0.001,MCMC.burnin=1000000, MCMC.interval=10000) )
++ sim <- fit$newnetwork
++ save(sim, file="sim2.RData")
++ }else{
++   
++ ####### 3. Check how good sim and theta are
++ # load(file="sim2.RData")
++ # theta <- c(-4.04102369, 1.92622055, -0.01309495, 0.40731208)
++ sim <- simulate_ergm.tapered(sim ~ edges+nodematch("x")+ kstar(2) + triangles,
++                tapering.centers=mv_1, tau=0.25/mv_1,
++                # control=control.simulate.formula(MCMC.burnin=1000000, MCMC.interval=10000),
++                coef = theta)
++ }
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+SAN network compared to target statistics:
+
+                                        target.stats     
+Taper(0.000655721083571012)~edges           381.2597  381
+Taper(0.000733097412811259)~nodematch.x     341.0188  341
+Taper(8.08523101251413e-05)~kstar2         3092.0576 3088
+Taper(0.00141873674545196)~triangle         176.2131  176
+Called from: ergm.tapered(formula, eval.loglik = FALSE, target.stats = mv_1, 
+    control = control.ergm.tapered(parallel = 4, init = theta, 
+  ...
+Browse[1]> cbind(theta,mv_1,summary(sim ~ edges+nodematch("x")+ kstar(2) + triangles))
+                 theta      mv_1      
+edges       -1.8793576  381.2597  1280
+nodematch.x  1.4214192  341.0188   653
+kstar2      -0.1594352 3092.0576 32392
+triangle     0.7495866  176.2131  2730
+Browse[1]> # pdf("sim.pdf")
+Browse[1]> plot(sim ,vertex.col=c(1,3)[(sim %v% "x")+1])
+Browse[1]> # dev.off()
+Browse[1]> 
+Browse[1]> 
+Browse[1]> ###### 2. Optim this function for theta
+Browse[1]> registerDoParallel(10)
+Browse[1]> fn <- function(theta,sim,mv_1,nsims){
++   a = foreach(i = 1:10, .combine = rbind) %dorng% {
++   simulate_ergm.tapered(sim ~ edges+nodematch("x")+ kstar(2) + triangles,
++                tapering.centers=mv_1, tau=0.25/mv_1,
++                nsim = nsims,
++                # control=control.simulate.formula(MCMC.burnin=1000000, MCMC.interval=100000),
++                coef = theta,         
++                output = "stats"
++   )
++   }
++ o <- colMeans(a)-mv_1
++ # o2 <- c(3,3,0.5,1)*o*o
++ o2 <- o*o
++ # o2 <- c(1,1,1,3)*o*o
++ message(sprintf("val = %f %f %f %f: %f", o[1],o[2],o[3],o[4], sqrt(sum(o2))))
++ sqrt(sum(o2))
++ }
+Browse[1]> theta
+      edges nodematch.x      kstar2    triangle 
+ -1.8793576   1.4214192  -0.1594352   0.7495866 
+Browse[1]> fn(theta,sim,mv_1,nsims)
+val = 13.854936 0.030300 -100.025300 0.110900: 100.980360
+[1] 100.9804
+Browse[1]> fit <- optim(par=theta, fn=fn, sim=sim, mv_1=mv_1, nsims=nsims, control=list(maxit=50,abstol=2,trace=6))
+  Nelder-Mead direct search function minimizer
+val = 13.888136 0.160100 -99.893400 0.189000: 100.854514
+function value for initial parameters = 100.854514
+  Scaled convergence tolerance is 1.50285e-06
+Stepsize computed as 0.187936
+val = 18.629936 3.581300 -41.484100 2.151700: 45.666843
+val = 17.597636 12.521600 -52.323000 8.638100: 57.260635
+val = 69.372836 41.841100 845.370500 54.925200: 851.017819
+val = 15.964236 8.348800 -39.957300 31.431900: 53.936161
+BUILD              5 851.017819 45.666843
+val = -38.808064 -37.236200 -886.833400 -39.921100: 889.359193
+val = 43.401936 25.151400 385.047800 32.830400: 389.687008
+HI-REDUCTION       7 389.687008 45.666843
+val = -10.900064 -14.600800 -485.022200 -14.648500: 485.585325
+val = 29.994536 16.061100 160.589600 21.438100: 165.548310
+HI-REDUCTION       9 165.548310 45.666843
+val = 3.033036 -3.730000 -273.902200 -2.143000: 273.952769
+val = 23.408236 11.206700 51.770600 16.023700: 60.087350
+HI-REDUCTION      11 100.854514 45.666843
+val = 23.915436 17.855600 55.858400 28.100300: 69.286061
+val = 21.410636 13.516600 16.850000 21.174100: 37.059126
+LO-REDUCTION      13 60.087350 37.059126
+val = 13.616436 8.003100 -108.745900 14.279300: 110.810767
+val = 20.953136 10.343500 10.559400 15.400900: 29.911713
+HI-REDUCTION      15 57.260635 29.911713
+val = 20.790136 4.695500 25.244400 27.125700: 42.747641
+val = 20.050036 6.876200 5.802800 21.299900: 30.604645
+LO-REDUCTION      17 53.936161 29.911713
+val = 24.159636 8.829500 37.447100 1.409200: 45.452384
+val = 22.346436 8.959300 18.253300 8.056200: 31.268476
+LO-REDUCTION      19 45.666843 29.911713
+val = 23.585536 16.125500 65.614700 31.190100: 78.066769
+val = 19.899436 6.782200 -14.445000 9.123500: 27.090258
+HI-REDUCTION      21 37.059126 27.090258
+val = 20.212136 2.719900 -8.412800 5.795600: 22.809921
+val = 19.698236 -2.964900 -18.818400 -1.178300: 27.428666
+REFLECTION        23 31.268476 22.809921
+val = 18.150036 4.677700 -21.645100 18.308000: 33.985260
+val = 21.232536 7.874400 7.698600 10.356700: 26.064467
+HI-REDUCTION      25 30.604645 22.809921
+val = 20.891736 6.719900 -8.254600 -0.412500: 23.450592
+val = 20.686636 6.906800 -5.273900 4.678100: 22.920284
+LO-REDUCTION      27 29.911713 22.809921
+val = 20.085036 1.419800 -20.062200 -0.112400: 28.424092
+val = 20.353236 3.894000 -11.807700 3.753800: 24.143948
+LO-REDUCTION      29 27.090258 22.809921
+val = 21.344336 3.863500 5.848400 3.179800: 22.689694
+val = 22.191436 2.441600 17.882000 0.497100: 28.608290
+REFLECTION        31 26.064467 22.689694
+val = 19.903736 0.792200 -18.288300 -1.177100: 27.067208
+val = 20.969136 5.960000 1.717500 7.306000: 23.055449
+HI-REDUCTION      33 24.143948 22.689694
+val = 21.397136 6.111900 10.559500 6.951800: 25.593423
+val = 20.585736 4.654100 -6.754600 4.688100: 22.650300
+HI-REDUCTION      35 23.055449 22.650300
+val = 20.539336 2.900400 -6.545700 2.115000: 21.853971
+val = 20.227336 1.379800 -12.660800 -0.791500: 23.915921
+REFLECTION        37 22.920284 21.853971
+val = 20.527936 -0.218800 -3.638500 2.906800: 21.050705
+val = 20.494236 -4.103900 -2.843300 1.700900: 21.162068
+REFLECTION        39 22.809921 21.050705
+val = 21.353536 2.790700 1.645300 0.361900: 21.600914
+val = 20.963736 2.687500 -1.513000 1.669600: 21.255061
+LO-REDUCTION      41 22.689694 21.050705
+val = 19.970636 1.110800 -15.867500 2.427900: 25.646295
+val = 20.964836 2.892700 -0.210700 2.695400: 21.335455
+HI-REDUCTION      43 22.650300 21.050705
+val = 21.035936 0.063500 2.046900 0.463200: 21.140459
+val = 20.945136 1.130500 -0.562100 1.508000: 21.037271
+LO-REDUCTION      45 21.853971 21.037271
+val = 21.260436 0.556000 4.977400 2.365000: 21.970048
+val = 20.584736 2.425300 -5.882200 2.202600: 21.657912
+HI-REDUCTION      47 21.657912 21.037271
+val = 21.103836 1.215100 2.351200 2.309700: 21.394187
+val = 21.092536 1.488700 1.872700 2.333000: 21.355589
+LO-REDUCTION      49 21.355589 21.037271
+val = 20.843536 2.051500 -2.425100 2.388700: 21.219063
+val = 20.840836 1.744900 -2.051100 2.378300: 21.148249
+Exiting from Nelder Mead minimizer
+    51 function evaluations used
+Browse[1]> fit
+$par
+      edges nodematch.x      kstar2    triangle 
+ -1.6963189   1.3521774  -0.1465982   0.7393481 
+
+$value
+[1] 21.03727
+
+$counts
+function gradient 
+      51       NA 
+
+$convergence
+[1] 1
+
+$message
+NULL
+
+Browse[1]> theta <- fit$par
+Browse[1]> names(theta) <- names(mv_1)
+Browse[1]> sim <- simulate_ergm.tapered(sim ~ edges+nodematch("x")+ kstar(2) + triangles,
++                tapering.centers=mv_1, tau=0.25/mv_1,
++                control=control.simulate.formula(MCMC.burnin=1000000, MCMC.interval=10000),
++                coef = theta)
+Browse[1]> cbind(theta,mv_1,summary(sim ~ edges+nodematch("x")+ kstar(2) + triangles))
+                 theta      mv_1     
+edges       -1.6963189  381.2597  399
+nodematch.x  1.3521774  341.0188  341
+kstar2      -0.1465982 3092.0576 3045
+triangle     0.7393481  176.2131  188
+Browse[1]> save(sim, theta, file="sim2.RData")
+Browse[1]> debug: fit <- ergm(newformula, control = control, response = response, 
+    constraints = constraints, reference = reference, eval.loglik = eval.loglik, 
+    verbose = verbose, ...)
+Browse[2]> Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Warning: ‘glpk’ selected as the solver, but package ‘Rglpk’ is not available; falling back to ‘lpSolveAPI’. This should be fine unless the sample size and/or the number of parameters is very big.
+Optimizing with step length 0.2885.
+The log-likelihood improved by 2.7121.
+Iteration 2 of at most 60:
+Optimizing with step length 0.5089.
+The log-likelihood improved by 4.1356.
+Iteration 3 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 1.3372.
+Increasing target MCMC sample size to 24310, ESS to 2431.
+Iteration 4 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0354.
+Precision adequate. Performing one more iteration.
+Iteration 5 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0004.
+Precision adequate twice. Stopping.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+debug: fit <- ergm(newformula, control = control, response = response, 
+    constraints = constraints, reference = reference, estimate = estimate, 
+    eval.loglik = eval.loglik, verbose = verbose, ...)
+Browse[2]> Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 0.2885.
+The log-likelihood improved by 2.7121.
+Iteration 2 of at most 60:
+Optimizing with step length 0.5089.
+The log-likelihood improved by 4.1356.
+Iteration 3 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 1.3372.
+Increasing target MCMC sample size to 24310, ESS to 2431.
+Iteration 4 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0354.
+Precision adequate. Performing one more iteration.
+Iteration 5 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0004.
+Precision adequate twice. Stopping.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+debug: fit$tapering.centers <- taper.stats
+Browse[2]> debug: fit$tapering.centers.o <- ostats
+Browse[2]> debug: fit$tapering.centers.t <- taper.terms
+Browse[2]> debug: fit$tapering.coef <- tau
+Browse[2]> debug: fit$r <- r
+Browse[2]> debug: cnames.all <- param_names(fit)
+Browse[2]> debug: a <- grep("Taper_Penalty", cnames.all, fixed = TRUE)
+Browse[2]> debug: if (length(a) > 0) {
+    blim <- c(3, 3)
+    fit$Taper_Penalty <- stats::coef(fit)[a]
+    fit$r <- r/sqrt(blim[2] * exp(log(2) * (fit$Taper_Penalty - 
+        blim[1]))/(1 + exp(log(2) * (fit$Taper_Penalty - blim[1]))))
+    fit$tapering.coef <- tau * r * r/(fit$r * fit$r)
+}
+Browse[2]> debug: a <- grep("Var(", cnames.all, fixed = TRUE)
+Browse[2]> debug: if (length(a) > 0) {
+    a <- -1/(stats::coef(fit)[a] * pmax(1, fit$tapering.centers))
+    a[is.nan(a) | a < 0] <- 0
+    fit$r <- mean(sqrt(a))
+    fit$tapering.coef <- tau * r * r/(fit$r * fit$r)
+}
+Browse[2]> debug: fit$orig.formula <- formula
+Browse[2]> debug: if (estimate == "MLE") {
+    if (fixed) {
+        sample <- as.matrix(fit$sample)[, 1:npar, drop = FALSE]
+        fit$hessian <- fit$hessian[1:npar, 1:npar]
+        fit$covar <- fit$covar[1:npar, 1:npar]
+        fcoef <- coef(fit)[1:npar]
+    }
+    else {
+        sample <- as.matrix(fit$sample)[, 1:npar, drop = FALSE]
+        fcoef <- coef(fit)[1:npar]
+    }
+    colnames(sample) <- names(ostats)
+    fulltau <- fcoef - fcoef
+    nm <- match(names(fcoef), names(tau))
+    fulltau[seq_along(fulltau)[!is.na(nm)]] <- fit$tapering.coef[nm[!is.na(nm)]]
+    fcoef[seq_along(fulltau)[!is.na(nm)]] <- fcoef[nm[!is.na(nm)]]
+    fit$tapering.coefficients <- fulltau
+    fit$taudelta.offset <- 2 * fulltau * as.vector(apply(sapply(fit$sample, 
+        function(x) {
+            apply(x[, -ncol(x)], 2, sd)
+        }), 1, mean))
+    if (!is.valued(nw)) {
+        fit$taudelta.mean <- apply((2 * fit.MPLE$glm.result$value$model[, 
+            1] - 1) * sweep(fit.MPLE$xmat.full, 2, fulltau, "*"), 
+            2, weighted.mean, weight = fit.MPLE$glm.result$value$prior.weights)
+        fit$taudelta.mad <- apply((2 * fit.MPLE$glm.result$value$model[, 
+            1] - 1) * sweep(abs(fit.MPLE$xmat.full), 2, fulltau, 
+            "*"), 2, weighted.mean, weight = fit.MPLE$value$glm.result$prior.weights)
+    }
+    if (is.null(tapering.centers)) {
+        nm <- match(names(ostats), names(tau))
+        ihess <- cov(sample)
+        hess <- .tapered.hessian(ihess, fulltau)
+        if (is.curved(fit)) {
+            curved_m <- ergm_model(formula, nw, response = response, 
+                ...)
+            curved_m <- .tapered.curved.hessian(hess, fcoef, 
+                curved_m$etamap)
+            fit$hessian[colnames(fit$hessian) %in% colnames(curved_m), 
+                rownames(fit$hessian) %in% rownames(curved_m)] <- curved_m
+            fit$covar[colnames(fit$hessian) %in% colnames(curved_m), 
+                rownames(fit$hessian) %in% rownames(curved_m)] <- -MASS::ginv(curved_m)
+        }
+        else {
+            fit$hessian[colnames(fit$hessian) %in% colnames(hess), 
+                rownames(fit$hessian) %in% rownames(hess)] <- hess
+            fit$covar[colnames(fit$hessian) %in% colnames(hess), 
+                rownames(fit$hessian) %in% rownames(hess)] <- -MASS::ginv(hess)
+        }
+        if (mean(diag(fit$covar) < 0) > 0.5) {
+            fit$covar <- -fit$covar
+            fit$hessian <- -fit$hessian
+        }
+    }
+}
+Browse[2]> debug: if (fixed) {
+    sample <- as.matrix(fit$sample)[, 1:npar, drop = FALSE]
+    fit$hessian <- fit$hessian[1:npar, 1:npar]
+    fit$covar <- fit$covar[1:npar, 1:npar]
+    fcoef <- coef(fit)[1:npar]
+} else {
+    sample <- as.matrix(fit$sample)[, 1:npar, drop = FALSE]
+    fcoef <- coef(fit)[1:npar]
+}
+Browse[2]> debug: sample <- as.matrix(fit$sample)[, 1:npar, drop = FALSE]
+Browse[2]> debug: fit$hessian <- fit$hessian[1:npar, 1:npar]
+Browse[2]> debug: fit$covar <- fit$covar[1:npar, 1:npar]
+Browse[2]> debug: fcoef <- coef(fit)[1:npar]
+Browse[2]> debug: colnames(sample) <- names(ostats)
+Browse[2]> debug: fulltau <- fcoef - fcoef
+Browse[2]> debug: nm <- match(names(fcoef), names(tau))
+Browse[2]> debug: fulltau[seq_along(fulltau)[!is.na(nm)]] <- fit$tapering.coef[nm[!is.na(nm)]]
+Browse[2]> debug: fcoef[seq_along(fulltau)[!is.na(nm)]] <- fcoef[nm[!is.na(nm)]]
+Browse[2]> debug: fit$tapering.coefficients <- fulltau
+Browse[2]> debug: fit$taudelta.offset <- 2 * fulltau * as.vector(apply(sapply(fit$sample, 
+    function(x) {
+        apply(x[, -ncol(x)], 2, sd)
+    }), 1, mean))
+Browse[2]> debug: if (!is.valued(nw)) {
+    fit$taudelta.mean <- apply((2 * fit.MPLE$glm.result$value$model[, 
+        1] - 1) * sweep(fit.MPLE$xmat.full, 2, fulltau, "*"), 
+        2, weighted.mean, weight = fit.MPLE$glm.result$value$prior.weights)
+    fit$taudelta.mad <- apply((2 * fit.MPLE$glm.result$value$model[, 
+        1] - 1) * sweep(abs(fit.MPLE$xmat.full), 2, fulltau, 
+        "*"), 2, weighted.mean, weight = fit.MPLE$value$glm.result$prior.weights)
+}
+Browse[2]> debug: fit$taudelta.mean <- apply((2 * fit.MPLE$glm.result$value$model[, 
+    1] - 1) * sweep(fit.MPLE$xmat.full, 2, fulltau, "*"), 2, 
+    weighted.mean, weight = fit.MPLE$glm.result$value$prior.weights)
+Browse[2]> debug: fit$taudelta.mad <- apply((2 * fit.MPLE$glm.result$value$model[, 
+    1] - 1) * sweep(abs(fit.MPLE$xmat.full), 2, fulltau, "*"), 
+    2, weighted.mean, weight = fit.MPLE$value$glm.result$prior.weights)
+Browse[2]> debug: if (is.null(tapering.centers)) {
+    nm <- match(names(ostats), names(tau))
+    ihess <- cov(sample)
+    hess <- .tapered.hessian(ihess, fulltau)
+    if (is.curved(fit)) {
+        curved_m <- ergm_model(formula, nw, response = response, 
+            ...)
+        curved_m <- .tapered.curved.hessian(hess, fcoef, curved_m$etamap)
+        fit$hessian[colnames(fit$hessian) %in% colnames(curved_m), 
+            rownames(fit$hessian) %in% rownames(curved_m)] <- curved_m
+        fit$covar[colnames(fit$hessian) %in% colnames(curved_m), 
+            rownames(fit$hessian) %in% rownames(curved_m)] <- -MASS::ginv(curved_m)
+    }
+    else {
+        fit$hessian[colnames(fit$hessian) %in% colnames(hess), 
+            rownames(fit$hessian) %in% rownames(hess)] <- hess
+        fit$covar[colnames(fit$hessian) %in% colnames(hess), 
+            rownames(fit$hessian) %in% rownames(hess)] <- -MASS::ginv(hess)
+    }
+    if (mean(diag(fit$covar) < 0) > 0.5) {
+        fit$covar <- -fit$covar
+        fit$hessian <- -fit$hessian
+    }
+}
+Browse[2]> debug: class(fit) <- c("ergm.tapered", family, class(fit))
+Browse[2]> debug: fit
+Browse[2]> > 
+> proc.time()
+   user  system elapsed 
+284.781  32.741  57.604 

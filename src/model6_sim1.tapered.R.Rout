@@ -1,0 +1,211 @@
+> rm(list=ls())
+> my.seed=1
+> my.seed=2
+> my.seed=3
+> my.seed=4
+> my.seed=5
+> my.seed=6
+> my.seed=1
+> my.seed=3
+> my.seed=4
+> my.seed=5
+> my.seed=7
+> my.seed=2
+> set.seed(my.seed)
+> 
+> pdf("model6_sim1.tapered.pdf")
+> 
+> library(ergm.tapered)
+Loading required package: ergm
+Loading required package: network
+
+‘network’ 1.18.0 (2022-10-05), part of the Statnet Project
+* ‘news(package="network")’ for changes since last version
+* ‘citation("network")’ for citation information
+* ‘https://statnet.org’ for help, support, and other information
+
+
+‘ergm’ 4.3-6983 (2022-08-20), part of the Statnet Project
+* ‘news(package="ergm")’ for changes since last version
+* ‘citation("ergm")’ for citation information
+* ‘https://statnet.org’ for help, support, and other information
+
+‘ergm’ 4 is a major update that introduces some backwards-incompatible
+changes. Please type ‘news(package="ergm")’ for a list of major
+changes.
+
+> library(doRNG)
+Loading required package: foreach
+Loading required package: rngtools
+> library(mfergm)
+> library(optimx)     # mfergm likelihood
+> library(R.utils)    # set time on ergm
+Loading required package: R.oo
+Loading required package: R.methodsS3
+R.methodsS3 v1.8.2 (2022-06-13 22:00:14 UTC) successfully loaded. See ?R.methodsS3 for help.
+R.oo v1.25.0 (2022-06-12 02:20:02 UTC) successfully loaded. See ?R.oo for help.
+
+Attaching package: ‘R.oo’
+
+The following object is masked from ‘package:R.methodsS3’:
+
+    throw
+
+The following objects are masked from ‘package:methods’:
+
+    getClasses, getMethods
+
+The following objects are masked from ‘package:base’:
+
+    attach, detach, load, save
+
+R.utils v2.12.0 (2022-06-28 03:20:05 UTC) successfully loaded. See ?R.utils for help.
+
+Attaching package: ‘R.utils’
+
+The following object is masked from ‘package:utils’:
+
+    timestamp
+
+The following objects are masked from ‘package:base’:
+
+    cat, commandArgs, getOption, isOpen, nullfile, parse, warnings
+
+> library(doParallel) # parallel loops using 'foreach'
+Loading required package: iterators
+Loading required package: parallel
+> 
+> #####################################################################
+> #                                                                   #
+> #     Create High Transitivity ERGM Params (using ERGM fitting)     #
+> #                                                                   #
+> #####################################################################
+> 
+> nsims       =  1000                              # number of networks simulated
+> n           =  100                                # number of nodes
+> #theta       =  c(-3,2,1,3) * c(2,2,1/n,1/n)      # true parameters for model 2
+> theta       =  c(-2,1,1,1) * c(2,2,1/n,1/n)      # true parameters for model 1
+> theta <- c(-3.11183382, 1.30595884, -0.05619853, 0.5128198) 
+> theta <- c(-3.11, 1.31, -0.05, 0.513) 
+> theta <- c(-3.11, 1.31, -0.06, 0.52) 
+> theta <- c(-3.11, 1.31, -0.08, 0.52) 
+> theta <- c(-3.11, 1.31, -0.0675, 0.515) 
+> theta <- c(-3.11, 1.31, -0.0675, 0.5125) 
+> theta <- c(-3.11, 1.31, -0.067, 0.5125) 
+> theta <- c(-3.11, 1.31, -0.067, 0.5124) 
+> theta <- c(-3.11, 1.31, -0.0665, 0.51255) 
+> theta <- c(-3.11, 1.31, -0.066, 0.5125) 
+> theta <- c(-3.11, 1.31, -0.066, 0.513) 
+> theta <- c(-3.11, 1.31, -0.066, 0.5133) 
+> theta <- c(-3.11, 1.31, -0.06601, 0.5133) 
+> theta <- c(-3.11, 1.31, -0.0657, 0.5131) 
+> theta <- c(-3.11, 1.31, -0.065, 0.513) 
+> theta <- c(-3.11, 1.31, -0.066, 0.513) 
+> theta <- c(-3.11, 1.31, -0.066, 0.515) 
+> theta <- c(-3.11, 1.31, -0.06565, 0.515) 
+> theta <- c(-3.11, 1.31, -0.0657, 0.512) 
+> theta <- c(-3.11, 1.31, -0.0657, 0.51135) 
+> theta <- c(-3.11, 1.31, -0.0657, 0.52) 
+> 
+> theta <- c(-3.025, 1.329, -0.066, 0.528)
+> theta <- c(-3.025, 1.329, -0.068, 0.5265)
+> mv_1 <- c(394, 342, 3800, 475)
+> 
+> theta <- c(-3.025, 1.329, -0.1, 0.45)
+> theta <- c(-1.8422865, 1.3471528, -0.1535736, 0.8494604)
+> theta <- c(-1.842, 1.347, -0.153, 0.840)
+> theta <- c(-1.842, 1.347, -0.154, 0.853) #perfect
+> theta <- c(-1.842, 1.347, -0.15395, 0.853)
+> mv_1 <- c(394, 342, 3200, 400)
+> mv_1 <- c(394, 342, 3000, 200)
+> ##################
+> #                #
+> #     Set-up     #
+> #                #
+> ##################
+> 
+> g <- initialize.network(theta, n, directed = FALSE)
+> x <- rbinom(n, 1, 0.5) # attributes
+> set.vertex.attribute(g, # the name of the network object
++                      "x", # the name we want to reference the variable by in that object
++                      x # the value we are giving that variable
++ ) 
+> 
+> formula <- g ~ edges + nodematch("x") + kstar(2) + triangles
+> names(mv_1) <- names(summary(formula))
+> 
+> fit <- ergm.tapered(formula, eval.loglik=FALSE, target.stats=mv_1,
++                     control=control.ergm.tapered(parallel=4,init=theta, MCMLE.MCMC.precision=0.001,MCMC.burnin=1000000, MCMC.interval=10000) )
+Starting maximum pseudolikelihood estimation (MPLE):
+Evaluating the predictor and response matrix.
+Maximizing the pseudolikelihood.
+Finished MPLE.
+Stopping at the initial estimate.
+SAN network compared to target statistics:
+
+                                        target.stats     
+Taper(0.000634517766497462)~edges                394  394
+Taper(0.000730994152046784)~nodematch.x          342  342
+Taper(8.33333333333333e-05)~kstar2              3000 3000
+Taper(0.00125)~triangle                          200  200
+Starting Monte Carlo maximum likelihood estimation (MCMLE):
+Iteration 1 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0097.
+Increasing target MCMC sample size to 670, ESS to 67.
+Iteration 2 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0187.
+Increasing target MCMC sample size to 700, ESS to 70.
+Iteration 3 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0047.
+Increasing target MCMC sample size to 780, ESS to 78.
+Iteration 4 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0072.
+Increasing target MCMC sample size to 990, ESS to 99.
+Iteration 5 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0087.
+Precision adequate. Performing one more iteration.
+Iteration 6 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0142.
+Increasing target MCMC sample size to 1570, ESS to 157.
+Iteration 7 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0121.
+Increasing target MCMC sample size to 4960, ESS to 496.
+Iteration 8 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0106.
+Precision adequate. Performing one more iteration.
+Iteration 9 of at most 60:
+Optimizing with step length 1.0000.
+The log-likelihood improved by 0.0013.
+Precision adequate twice. Stopping.
+Finished MCMLE.
+This model was fit using MCMC.  To examine model diagnostics and check
+for degeneracy, use the mcmc.diagnostics() function.
+Warning message:
+In ergm.tapered(formula, eval.loglik = FALSE, target.stats = mv_1,  :
+  check the names are ordered correctly (not coded yet)
+> 
+> #theta <- coef(fit)
+> cbind(theta, coef(fit))
+               theta           
+edges       -1.84200 -1.8819298
+nodematch.x  1.34700  1.3390734
+kstar2      -0.15395 -0.1505533
+triangle     0.85300  0.8523954
+> plot(fit$newnetwork)
+> set.seed(my.seed)
+> registerDoParallel(10)
+> a = foreach(i = 1:10) %dorng% {
++  simulate_ergm.tapered(fit$newnetwork ~ edges + nodematch("x") + kstar(2) + triangles, 
++                   nsim = nsims, tapering.centers=mv_1, tau=0.25/mv_1,
++                   coef = theta,
++ 		  control=control.simulate.formula(MCMC.burnin=100000, MCMC.interval=10000)
++                               )
++ }

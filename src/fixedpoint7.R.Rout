@@ -1,0 +1,268 @@
+> rm(list=ls())
+> my.seed=1
+> set.seed(my.seed)
+> 
+> library(ergm.tapered)
+Loading required package: ergm
+Loading required package: network
+
+‘network’ 1.18.0 (2022-10-05), part of the Statnet Project
+* ‘news(package="network")’ for changes since last version
+* ‘citation("network")’ for citation information
+* ‘https://statnet.org’ for help, support, and other information
+
+
+‘ergm’ 4.3-6983 (2022-08-20), part of the Statnet Project
+* ‘news(package="ergm")’ for changes since last version
+* ‘citation("ergm")’ for citation information
+* ‘https://statnet.org’ for help, support, and other information
+
+‘ergm’ 4 is a major update that introduces some backwards-incompatible
+changes. Please type ‘news(package="ergm")’ for a list of major
+changes.
+
+> library(doRNG)
+Loading required package: foreach
+Loading required package: rngtools
+> library(mfergm)
+> library(optimx)     # mfergm likelihood
+> library(R.utils)    # set time on ergm
+Loading required package: R.oo
+Loading required package: R.methodsS3
+R.methodsS3 v1.8.2 (2022-06-13 22:00:14 UTC) successfully loaded. See ?R.methodsS3 for help.
+R.oo v1.25.0 (2022-06-12 02:20:02 UTC) successfully loaded. See ?R.oo for help.
+
+Attaching package: ‘R.oo’
+
+The following object is masked from ‘package:R.methodsS3’:
+
+    throw
+
+The following objects are masked from ‘package:methods’:
+
+    getClasses, getMethods
+
+The following objects are masked from ‘package:base’:
+
+    attach, detach, load, save
+
+R.utils v2.12.0 (2022-06-28 03:20:05 UTC) successfully loaded. See ?R.utils for help.
+
+Attaching package: ‘R.utils’
+
+The following object is masked from ‘package:utils’:
+
+    timestamp
+
+The following objects are masked from ‘package:base’:
+
+    cat, commandArgs, getOption, isOpen, nullfile, parse, warnings
+
+> library(doParallel) # parallel loops using 'foreach'
+Loading required package: iterators
+Loading required package: parallel
+> 
+> #####################################################################
+> #                                                                   #
+> #     Create High Transitivity ERGM Params (using ERGM fitting)     #
+> #                                                                   #
+> #####################################################################
+> 
+> nsims       =  1000                              # number of networks simulated
+> n           =  100                               # number of nodes
+> theta       =  c(-2,1,1,1) * c(2,2,1/n,1/n)      # true parameters for model 1
+> theta <- c(-1.842, 1.347, -0.154, 0.853) #perfect
+> theta <- c(-2.162, 1.457, -0.1314, 0.736)
+> theta <- c(-2.0967979, 1.4274966, -0.1387846, 0.7541693)
+> theta <- c(-2.1088249, 1.4353562, -0.1380418, 0.7504813)
+> theta <- c(-2.0766314, 1.4381472, -0.1398167, 0.7496554)
+> theta <- c(-1.9746393, 1.4805697, -0.1417278, 0.7249104)
+> theta <- c(-2.0028533, 1.5853063, -0.1655770, 0.7367452)
+> theta <- c(-1.8239798, 1.4320427, -0.1626898, 0.7308445)
+> theta <- c(-1.8793576, 1.4214192, -0.1594352, 0.7495866)
+> mv_1 <- c(394, 342, 3000, 180)
+> mv_1 <- c(358.16, 351.24, 1.0*2643.56, 1.0*123.69)
+> mv_1 <- c(400.31, 349.88, 3254.42, 1.4*126.28)
+> mv_1 <- c(393.0512, 341.0188, 3092.0576, 117.4754)
+> mv_1 <- c(393.0512, 341.0188, 3092.0576, 1.45*117.4754)
+> ##################
+> #                #
+> #     Set-up     #
+> #                #
+> ##################
+> 
+> sim <- initialize.network(theta, n, directed = FALSE)
+> x <- rbinom(n, 1, 0.5) # attributes
+> set.vertex.attribute(sim, # the name of the network object
++                      "x", # the name we want to reference the variable by in that object
++                      x # the value we are giving that variable
++ ) 
+> 
+> load(file="sim2.RData")
+> formula <- sim ~ edges + nodematch("x") + kstar(2) + triangles
+> names(mv_1) <- names(summary(formula))
+> names(theta) <- names(mv_1)
+> 
+> if(F){
++ fit <- ergm.tapered(formula, eval.loglik=FALSE, target.stats=mv_1,
++                     control=control.ergm.tapered(parallel=4,init=theta, MCMLE.MCMC.precision=0.001,MCMC.burnin=1000000, MCMC.interval=10000) )
++ sim <- fit$newnetwork
++ save(sim, file="sim2.RData")
++ }else{
++ load(file="sim2.RData")
++ theta <- c(-4.04102369, 1.92622055, -0.01309495, 0.40731208)
++ sim <- simulate_ergm.tapered(sim ~ edges+nodematch("x")+ kstar(2) + triangles,
++                tapering.centers=mv_1, tau=0.25/mv_1,
++                control=control.simulate.formula(MCMC.burnin=1000000, MCMC.interval=10000),
++                coef = theta)
++ }
+> cbind(theta,mv_1,summary(sim ~ edges+nodematch("x")+ kstar(2) + triangles))
+                  theta      mv_1     
+edges       -4.04102369  393.0512  365
+nodematch.x  1.92622055  341.0188  328
+kstar2      -0.01309495 3092.0576 2936
+triangle     0.40731208  170.3393  171
+> pdf("sim.pdf")
+> plot(sim,vertex.col=c(1,3)[(sim %v% "x")+1])
+> dev.off()
+null device 
+          1 
+> 
+> registerDoParallel(10)
+> fn <- function(theta,sim,mv_1,nsims){
++   a = foreach(i = 1:10, .combine = rbind) %dorng% {
++   simulate_ergm.tapered(sim ~ edges+nodematch("x")+ kstar(2) + triangles,
++                tapering.centers=mv_1, tau=0.25/mv_1,
++                nsim = nsims,
++                control=control.simulate.formula(MCMC.burnin=1000000, MCMC.interval=100000),
++                coef = theta,         
++                output = "stats"
++   )
++   }
++ o <- colMeans(a)-mv_1
++ o2 <- c(3,3,0.5,1)*o*o
++ o2 <- o*o
++ o2 <- c(1,1,1,3)*o*o
++ message(sprintf("val = %f %f %f %f: %f", o[1],o[2],o[3],o[4], sqrt(sum(o2))))
++ sqrt(sum(o2))
++ }
+> theta
+[1] -4.04102369  1.92622055 -0.01309495  0.40731208
+> fn(theta,sim,mv_1,nsims)
+val = -9.096200 3.053800 -6.580100 2.376770: 12.341449
+[1] 12.34145
+> fit <- optim(par=theta, fn=fn, sim=sim, mv_1=mv_1, nsims=nsims, control=list(maxit=50,abstol=2,trace=6))
+  Nelder-Mead direct search function minimizer
+val = -9.071800 3.029100 -6.316300 2.380270: 12.180546
+function value for initial parameters = 12.180546
+  Scaled convergence tolerance is 1.81504e-07
+Stepsize computed as 0.404102
+val = 6.224400 15.456400 119.537500 2.501070: 120.770954
+val = 3.887500 26.445900 95.445800 11.606970: 101.136365
+val = 107.295400 84.817900 2212.203000 114.487170: 2225.279854
+val = -21.018400 0.951900 132.382000 91.658470: 207.777522
+BUILD              5 2225.279854 12.180546
+val = -129.665100 -95.575600 -1761.077100 -99.235630: 1776.762060
+val = -62.436500 -34.929800 -897.824500 -40.589730: 903.410106
+LO-REDUCTION       7 903.410106 12.180546
+val = 53.785500 53.914900 1124.396700 71.908870: 1133.834332
+val = -31.309700 -8.577000 -418.003300 -9.877830: 419.610934
+HI-REDUCTION       9 419.610934 12.180546
+val = 26.309900 35.570000 596.842300 47.059270: 604.004877
+val = -16.303600 3.516200 -169.059200 5.055770: 170.105457
+HI-REDUCTION      11 207.777522 12.180546
+val = -2.442600 9.615000 -89.861700 -38.204730: 112.037243
+val = -2.309100 11.625800 -42.262000 -18.472130: 54.315988
+LO-REDUCTION      13 170.105457 12.180546
+val = 15.670200 24.755600 257.786600 -6.187930: 259.667475
+val = -8.070700 9.299700 -66.913600 1.546770: 68.089852
+HI-REDUCTION      15 120.770954 12.180546
+val = -13.534000 9.415800 -130.318000 -5.513730: 131.703497
+val = 1.451500 14.574100 57.904300 0.658170: 59.738754
+HI-REDUCTION      17 101.136365 12.180546
+val = -12.007200 -8.681100 -124.957200 -20.245430: 130.627212
+val = -0.092600 18.494900 40.398600 3.928670: 44.949084
+HI-REDUCTION      19 68.089852 12.180546
+val = 3.605500 14.987200 89.951500 -8.571330: 92.462377
+val = -5.133300 10.832300 -28.123100 -1.160830: 30.637246
+HI-REDUCTION      21 59.738754 12.180546
+val = -9.248400 7.911800 -78.707400 -8.675830: 81.048099
+val = -1.225700 12.993200 22.865300 -1.499330: 26.455463
+HI-REDUCTION      23 54.315988 12.180546
+val = -7.732500 9.375700 63.828100 26.054170: 79.108666
+val = -2.877900 11.709900 -19.428400 -9.539630: 28.211353
+HI-REDUCTION      25 44.949084 12.180546
+val = -8.522600 0.606400 -54.087400 -9.251930: 57.054745
+val = -2.278800 14.156900 15.776800 0.623470: 21.346763
+HI-REDUCTION      27 30.637246 12.180546
+val = -2.138800 10.448000 34.128200 -3.892830: 36.385871
+val = -4.311100 10.829600 -12.459400 -1.566230: 17.276044
+HI-REDUCTION      29 28.211353 12.180546
+val = -6.089600 8.496400 29.398300 10.462970: 36.082590
+val = -3.437900 11.053400 -7.482600 -5.022930: 16.299558
+HI-REDUCTION      31 26.455463 12.180546
+val = -8.252200 6.686800 -29.575100 -0.438230: 31.433657
+val = -2.925700 11.368000 9.888700 -1.389230: 15.536004
+HI-REDUCTION      33 21.346763 12.180546
+val = -7.270400 4.150900 -22.481800 -3.489230: 24.739527
+val = -3.472000 11.818500 6.642200 -0.268230: 14.002371
+HI-REDUCTION      35 17.276044 12.180546
+val = -4.671200 8.192100 13.752400 -1.013230: 16.767201
+val = -4.720300 8.772100 5.779300 -1.380530: 11.762180
+LO-REDUCTION      37 16.299558 11.762180
+val = -6.753300 6.354000 16.624200 4.886870: 20.832400
+val = -4.121800 9.972800 -2.588300 -2.874530: 12.162814
+HI-REDUCTION      39 15.536004 11.762180
+val = -7.755700 5.375400 -8.435500 0.349770: 12.671641
+val = -6.433200 6.964400 -3.216800 -0.221830: 10.019199
+LO-REDUCTION      41 14.002371 10.019199
+val = -8.740500 2.597600 -8.686000 -0.414530: 12.613721
+val = -7.278600 5.018200 -4.805000 -0.448830: 10.092211
+LO-REDUCTION      43 12.180546 10.019199
+val = -2.453700 12.144300 6.734600 -4.032930: 15.736997
+val = -7.284200 5.453300 -4.300900 0.413470: 10.090028
+HI-REDUCTION      45 12.162814 10.019199
+val = -9.067300 2.928000 -0.293000 2.549270: 10.505774
+val = -7.652600 4.778100 -1.128600 0.818770: 9.202033
+LO-REDUCTION      47 11.762180 9.202033
+val = -9.857200 2.031400 -12.328600 1.984470: 16.281883
+val = -5.891000 7.235600 1.490600 -0.654530: 9.516560
+HI-REDUCTION      49 10.092211 9.202033
+val = -6.367700 7.285200 0.028100 0.859970: 9.789851
+val = -6.504500 6.796200 0.587200 0.627470: 9.488035
+Exiting from Nelder Mead minimizer
+    51 function evaluations used
+> fit
+$par
+[1] -4.02999910  1.95069057 -0.01310148  0.39480594
+
+$value
+[1] 9.202033
+
+$counts
+function gradient 
+      51       NA 
+
+$convergence
+[1] 1
+
+$message
+NULL
+
+> theta <- fit$par
+> names(theta) <- names(mv_1)
+> sim <- simulate_ergm.tapered(sim ~ edges+nodematch("x")+ kstar(2) + triangles,
++                tapering.centers=mv_1, tau=0.25/mv_1,
++                control=control.simulate.formula(MCMC.burnin=1000000, MCMC.interval=10000),
++                coef = theta)
+> cbind(theta,mv_1,summary(sim ~ edges+nodematch("x")+ kstar(2) + triangles))
+                  theta      mv_1     
+edges       -4.02999910  393.0512  390
+nodematch.x  1.95069057  341.0188  343
+kstar2      -0.01310148 3092.0576 3167
+triangle     0.39480594  170.3393  164
+> save(sim, theta, file="sim2.RData")
+> 
+> proc.time()
+     user    system   elapsed 
+25407.875   229.854  5063.928 

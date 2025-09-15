@@ -1,0 +1,114 @@
+> rm(list=ls())
+> my.seed=3141
+> set.seed(my.seed)
+> 
+> library(ergm.tapered)
+Loading required package: ergm
+Loading required package: network
+
+‘network’ 1.18.0 (2022-10-05), part of the Statnet Project
+* ‘news(package="network")’ for changes since last version
+* ‘citation("network")’ for citation information
+* ‘https://statnet.org’ for help, support, and other information
+
+
+‘ergm’ 4.3-6983 (2022-08-20), part of the Statnet Project
+* ‘news(package="ergm")’ for changes since last version
+* ‘citation("ergm")’ for citation information
+* ‘https://statnet.org’ for help, support, and other information
+
+‘ergm’ 4 is a major update that introduces some backwards-incompatible
+changes. Please type ‘news(package="ergm")’ for a list of major
+changes.
+
+> library(doRNG)
+Loading required package: foreach
+Loading required package: rngtools
+> library(mfergm)
+> library(optimx)     # mfergm likelihood
+> library(R.utils)    # set time on ergm
+Loading required package: R.oo
+Loading required package: R.methodsS3
+R.methodsS3 v1.8.2 (2022-06-13 22:00:14 UTC) successfully loaded. See ?R.methodsS3 for help.
+R.oo v1.25.0 (2022-06-12 02:20:02 UTC) successfully loaded. See ?R.oo for help.
+
+Attaching package: ‘R.oo’
+
+The following object is masked from ‘package:R.methodsS3’:
+
+    throw
+
+The following objects are masked from ‘package:methods’:
+
+    getClasses, getMethods
+
+The following objects are masked from ‘package:base’:
+
+    attach, detach, load, save
+
+R.utils v2.12.0 (2022-06-28 03:20:05 UTC) successfully loaded. See ?R.utils for help.
+
+Attaching package: ‘R.utils’
+
+The following object is masked from ‘package:utils’:
+
+    timestamp
+
+The following objects are masked from ‘package:base’:
+
+    cat, commandArgs, getOption, isOpen, nullfile, parse, warnings
+
+> library(doParallel) # parallel loops using 'foreach'
+Loading required package: iterators
+Loading required package: parallel
+> 
+> #####################################################################
+> #                                                                   #
+> #     Create High Transitivity ERGM Params (using ERGM fitting)     #
+> #                                                                   #
+> #####################################################################
+> 
+> nsims       =  1000                               # number of networks simulated
+> n           =  100                               # number of nodes
+> mv_1 <- c(400.31, 349.88, 3254.42,     126.28)   # mean-value parameters standard model
+> mv_1 <- c(0.97*393.0512, 341.0188, 3092.0576, 1.5*117.4754)
+> theta <- c(-4.04102369, 1.92622055, -0.01309495, 0.40731208)
+> theta <- c(-4.04071794, 1.92361302, -0.01291308, 0.41322262)
+> ##################
+> #                #
+> #     Set-up     #
+> #                #
+> ##################
+> 
+> load("sim10.RData")
+> names(theta) <- names(summary(sim ~ edges + nodematch("x") + kstar(2) + triangles))
+> names(mv_1) <- names(summary(sim ~ edges + nodematch("x") + kstar(2) + triangles))
+> theta
+      edges nodematch.x      kstar2    triangle 
+-4.04071794  1.92361302 -0.01291308  0.41322262 
+> set.seed(my.seed)
+> registerDoParallel(10)
+> g_sim_stats = foreach(i = 1:10, .combine = rbind) %dorng% {
++  simulate_ergm.tapered(sim ~ edges + nodematch("x") + kstar(2) + triangles,
++                   nsim = 100*nsims, tapering.centers=mv_1, tau=0.25/mv_1,
++                   coef = theta,
++                   output = "stats",
++ 		  control=control.simulate.formula(MCMC.burnin=1000000, MCMC.interval=5000)
++                               )
++ }
+> apply(g_sim_stats,2,mean)
+      Taper(0.000655721083571012)~edges Taper(0.000733097412811259)~nodematch.x 
+                               383.1060                                343.8395 
+     Taper(8.08523101251413e-05)~kstar2     Taper(0.00141873674545196)~triangle 
+                              3089.2140                                176.4962 
+> cbind(mv_1, apply(g_sim_stats,2,mean))
+                 mv_1          
+edges        381.2597  383.1060
+nodematch.x  341.0188  343.8395
+kstar2      3092.0576 3089.2140
+triangle     176.2131  176.4962
+> save(g_sim_stats, file="g_sim_stats.RData")
+> 
+> proc.time()
+    user   system  elapsed 
+3266.886   14.105  333.714 
